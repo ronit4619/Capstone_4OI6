@@ -52,8 +52,8 @@ class TeamAssigner:
 
         self.kmeans = kmeans
 
-        self.team_colors[1] = kmeans.cluster_centers_[0]
-        self.team_colors[2] = kmeans.cluster_centers_[1]
+        self.team_colors[1] = [0, 0, 0]
+        self.team_colors[2] = [255, 255, 255]
 
 
     def get_player_team(self,frame,player_bbox,player_id):
