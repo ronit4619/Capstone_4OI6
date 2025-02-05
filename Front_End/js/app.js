@@ -15,36 +15,7 @@ function showRegister() {
 function showLogin() {
     document.getElementById('registerBox').classList.add('hidden');
     document.getElementById('loginBox').classList.remove('hidden');
-}
-
-function register() {
-    const username = document.getElementById('registerUsername').value;
-    const password = document.getElementById('registerPassword').value;
-    const confirmPass = document.getElementById('confirmPassword').value;
-    const privacyPolicyChecked = document.getElementById('privacyPolicy').checked;
-  
-    // Double-check the policy
-    if (!privacyPolicyChecked) {
-      alert('Please agree to the Privacy Policy to create an account.');
-      return;
-    }
-  
-    if (password !== confirmPass) {
-      alert('Passwords do not match!');
-      return;
-    }
-  
-    if (users.some(user => user.username === username)) {
-      alert('Username already exists!');
-      return;
-    }
-  
-    users.push({ username, password });
-    localStorage.setItem('basketballUsers', JSON.stringify(users));
-    alert('Registration successful!');
-    showLogin();
-  }  
-  
+}  
 
 function login() {
   const username = document.getElementById('loginUsername').value;
@@ -68,6 +39,101 @@ function logout() {
   document.getElementById('dashboard').style.display = 'none';
   showMainMenu();
 }
+
+/****************************************
+ *          Helper Function
+ ****************************************/
+function calculateAge(dobString) {
+    const today = new Date();
+    const birthDate = new Date(dobString);
+  
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+  
+    // Check if the birthday has not happened yet this year
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  }
+  
+  /****************************************
+   *          Registration Logic
+   ****************************************/
+  function register() {
+    const username = document.getElementById('registerUsername').value;
+    const password = document.getElementById('registerPassword').value;
+    const confirmPass = document.getElementById('confirmPassword').value;
+    const privacyPolicyChecked = document.getElementById('privacyPolicy').checked;
+    const dob = document.getElementById('dob').value;
+  
+    // Calculate user age
+    const userAge = calculateAge(dob);
+  
+    // Check if the user is under 13
+    if (userAge < 13) {
+      // Reveal the parental consent section
+      document.getElementById('parentConsentSection').classList.remove('hidden');
+  
+      // Check if the parent consent was provided
+      const parentConsentChecked = document.getElementById('parentConsent').checked;
+      if (!parentConsentChecked) {
+        alert('Users under 13 need parental consent.');
+        return;
+      }
+    }
+  
+    // Check if privacy policy is agreed
+    if (!privacyPolicyChecked) {
+      alert('Please agree to the Privacy Policy to create an account.');
+      return;
+    }
+  
+    // Verify password match
+    if (password !== confirmPass) {
+      alert('Passwords do not match!');
+      return;
+    }
+  
+    // Check if username already exists
+    if (users.some(user => user.username === username)) {
+      alert('Username already exists!');
+      return;
+    }
+  
+    // Create the new user object
+    users.push({ 
+      username, 
+      password, 
+      dob, 
+      age: userAge,
+      // For demonstration, store parent's consent status if needed
+    });
+    
+    localStorage.setItem('basketballUsers', JSON.stringify(users));
+    alert('Registration successful!');
+    showLogin();
+  }
+  
+  /****************************************
+   *          UI Events
+   ****************************************/
+  document.getElementById('dob').addEventListener('change', function() {
+    const dobValue = this.value;
+    const userAge = calculateAge(dobValue);
+  
+    // If user is under 13, show parental consent
+    if (userAge < 13) {
+      document.getElementById('parentConsentSection').classList.remove('hidden');
+    } else {
+      // Hide the parental consent section if they are >= 13
+      document.getElementById('parentConsentSection').classList.add('hidden');
+      // Optionally uncheck or clear parent's email
+      document.getElementById('parentConsent').checked = false;
+      // document.getElementById('parentEmail').value = '';
+    }
+  });
+  
 
 /****************************************
  *          Navigation Logic
