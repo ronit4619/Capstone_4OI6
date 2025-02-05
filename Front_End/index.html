@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Basketball AI Coach</title>
+  <!-- Link to your external CSS file -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <!-- Background basketballs -->
+  <div class="basketball-bg" style="top: 10%; left: 5%">🏀</div>
+  <div class="basketball-bg" style="top: 30%; right: 15%">🏀</div>
+  <div class="basketball-bg" style="bottom: 20%; left: 20%">🏀</div>
+
+  <!-- Authentication Section -->
+  <div class="auth-container" id="authContainer">
+    <!-- Login Form -->
+    <div class="auth-box" id="loginBox">
+      <h2 style="text-align: center; margin-bottom: 1.5rem; color: #ff6b35;">Welcome Back!</h2>
+      <form class="auth-form" id="loginForm">
+        <input type="text" placeholder="Username" id="loginUsername" required>
+        <input type="password" placeholder="Password" id="loginPassword" required>
+        <button type="button" onclick="login()">Sign In</button>
+      </form>
+      <div class="auth-toggle" style="text-align: center; margin-top: 1rem;">
+        New here? 
+        <span style="color: #ff6b35; cursor: pointer;" onclick="showRegister()">
+          Create an account
+        </span>
+      </div>
+    </div>
+
+    <!-- Register Form -->
+    <div class="auth-box hidden" id="registerBox">
+        <h2 style="text-align: center; margin-bottom: 1.5rem; color: #ff6b35;">
+        Get Started
+        </h2>
+        <form class="auth-form" id="registerForm">
+        <input type="text" placeholder="Username" id="registerUsername" required>
+        <input type="password" placeholder="Password" id="registerPassword" required>
+        <input type="password" placeholder="Confirm Password" id="confirmPassword" required>
+    
+        <!-- Privacy Policy Agreement -->
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="privacyPolicy" required>
+            <label for="privacyPolicy">
+            I agree to the 
+            <a href="privacy.html" target="_blank" 
+                style="color: #ff6b35; text-decoration: underline;">
+                Privacy Policy
+            </a>
+            </label>
+        </div>
+    
+        <button type="button" onclick="register()">Create Account</button>
+        </form>
+        <div class="auth-toggle" style="text-align: center; margin-top: 1rem;">
+        Already have an account? 
+        <span style="color: #ff6b35; cursor: pointer;" onclick="showLogin()">
+            Sign in here
+        </span>
+        </div>
+    </div>
+    </div>  
+
+  <!-- Dashboard -->
+  <div class="dashboard" id="dashboard">
+    <button class="logout-btn" onclick="logout()">Logout</button>
+    <button class="back-btn hidden" onclick="showMainMenu()">← Back</button>
+
+    <!-- Main Menu -->
+    <div class="main-menu" id="mainMenu">
+      <button class="option-button" onclick="showPage('livePage')">Live Analysis 🏀</button>
+      <button class="option-button" onclick="showPage('uploadPage')">Upload Session 📤</button>
+    </div>
+
+    <!-- Live Analysis Page -->
+    <div class="page-content" id="livePage">
+      <div class="camera-section">
+        <h2>Live Analysis 🏀</h2>
+        <div class="video-preview">
+          <video id="videoFeed" autoplay></video>
+        </div>
+        <button onclick="toggleCamera()" id="cameraToggle">Start Camera</button>
+      </div>
+    </div>
+
+    <!-- Upload Session Page -->
+    <div class="page-content" id="uploadPage">
+      <div class="upload-section">
+        <h2>Upload Session 📤</h2>
+        <div class="upload-container" 
+             onclick="document.getElementById('fileInput').click()">
+          <p>Click to upload basketball video</p>
+          <p>(MP4, AVI, MOV | Max 500MB)</p>
+        </div>
+        <input type="file" id="fileInput" accept="video/*">
+        <div class="video-preview hidden" id="uploadPreview">
+          <video id="uploadedVideo" controls 
+                 style="width: 100%; height: 100%;">
+          </video>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Link to your external JavaScript file -->
+  <script src="js/app.js"></script>
+</body>
+</html>
