@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Basketball AI Coach</title>
-  <!-- Link to your external CSS file -->
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -31,58 +30,51 @@
       </div>
     </div>
 
-        <!-- Register Form -->
+    <!-- Register Form -->
     <div class="auth-box hidden" id="registerBox">
-        <h2 style="text-align: center; margin-bottom: 1.5rem; color: #ff6b35;">Get Started</h2>
-        <form class="auth-form" id="registerForm">
-            <input type="text" placeholder="Username" id="registerUsername" required>
-            <input type="password" placeholder="Password" id="registerPassword" required>
-            <input type="password" placeholder="Confirm Password" id="confirmPassword" required>
-        
-            <!-- Date of Birth -->
-            <label for="dob" style="color: #ff6b35;">Date of Birth</label>
-            <input type="date" id="dob" required>
-        
-            <!-- Privacy Policy Agreement -->
-            <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <input type="checkbox" id="privacyPolicy" required>
-                <label for="privacyPolicy">
-                I agree to the 
-                <a href="privacy.html" target="_blank" style="color: #ff6b35; text-decoration: underline;">
-                    Privacy Policy
-                </a>
-                </label>
-            </div>
-        
-            <!-- Parental Consent Section (hidden by default) -->
-            <div id="parentConsentSection" class="hidden" style="margin-top: 1rem;">
-                <p style="color: red; font-weight: bold;">
-                You are under 13 years old. Please provide parental consent:
-                </p>
-                <!-- Option 1: A simple checkbox -->
-                <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <input type="checkbox" id="parentConsent">
-                <label for="parentConsent">I am the parent/guardian, and I consent.</label>
-                </div>
-        
-                <!-- Option 2 (alternative): Parent's Email -->
-                <!--
-                <label for="parentEmail">Parent/Guardian Email:</label>
-                <input type="email" id="parentEmail" placeholder="parent@example.com">
-                -->
-            </div>
-        
-            <button type="button" onclick="register()">Create Account</button>
-            </form>
-            <div class="auth-toggle" style="text-align: center; margin-top: 1rem;">
-                Already have an account?
-                <span style="color: #ff6b35; cursor: pointer;" onclick="showLogin()">
-                    Sign in here
-                </span>
-            </div>
+      <h2 style="text-align: center; margin-bottom: 1.5rem; color: #ff6b35;">Get Started</h2>
+      <form class="auth-form" id="registerForm">
+        <input type="text" placeholder="Username" id="registerUsername" required>
+        <input type="email" placeholder="Email (Optional)" id="registerEmail">
+        <input type="password" placeholder="Password" id="registerPassword" required>
+        <input type="password" placeholder="Confirm Password" id="confirmPassword" required>
+      
+        <!-- Date of Birth -->
+        <label for="dob" style="color: #ff6b35;">Date of Birth</label>
+        <input type="date" id="dob" required>
+      
+        <!-- Privacy Policy Agreement -->
+        <div style="display: flex; align-items: center; gap: 0.5rem;">
+          <input type="checkbox" id="privacyPolicy" required>
+          <label for="privacyPolicy">
+            I agree to the 
+            <a href="privacy.html" target="_blank" style="color: #ff6b35; text-decoration: underline;">
+              Privacy Policy
+            </a>
+          </label>
         </div>
+      
+        <!-- Parental Consent Section (hidden by default) -->
+        <div id="parentConsentSection" class="hidden" style="margin-top: 1rem;">
+          <p style="color: red; font-weight: bold;">
+            You are under 13 years old. Please provide parental consent:
+          </p>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input type="checkbox" id="parentConsent">
+            <label for="parentConsent">I am the parent/guardian, and I consent.</label>
+          </div>
+        </div>
+      
+        <button type="button" onclick="register()">Create Account</button>
+      </form>
+      <div class="auth-toggle" style="text-align: center; margin-top: 1rem;">
+        Already have an account?
+        <span style="color: #ff6b35; cursor: pointer;" onclick="showLogin()">
+          Sign in here
+        </span>
+      </div>
     </div>
-    
+  </div>
 
   <!-- Dashboard -->
   <div class="dashboard" id="dashboard">
@@ -110,16 +102,13 @@
     <div class="page-content" id="uploadPage">
       <div class="upload-section">
         <h2>Upload Session 📤</h2>
-        <div class="upload-container" 
-             onclick="document.getElementById('fileInput').click()">
+        <div class="upload-container" onclick="document.getElementById('fileInput').click()">
           <p>Click to upload basketball video</p>
           <p>(MP4, AVI, MOV | Max 500MB)</p>
         </div>
         <input type="file" id="fileInput" accept="video/*">
         <div class="video-preview hidden" id="uploadPreview">
-          <video id="uploadedVideo" controls 
-                 style="width: 100%; height: 100%;">
-          </video>
+          <video id="uploadedVideo" controls style="width: 100%; height: 100%;"></video>
         </div>
       </div>
     </div>
