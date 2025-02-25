@@ -3,6 +3,19 @@ const API_URL = "http://localhost:5000"; // Change if running on a different hos
 /****************************************
  *          Authentication Logic
  ****************************************/
+function stopCamera() {
+  let video = document.getElementById('videoFeed');
+  if (video && video.srcObject) {
+      let stream = video.srcObject;
+      let tracks = stream.getTracks();
+      tracks.forEach(track => track.stop()); // Stop all media tracks
+      video.srcObject = null; // Clear the video stream
+  }
+}
+
+
+
+
 function showRegister() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("registerBox").classList.remove("hidden");
