@@ -69,6 +69,7 @@ function logout() {
  ****************************************/
 async function register() {
   const username = document.getElementById("registerUsername").value;
+  const email = document.getElementById("registerEmail").value;  // Get email from input
   const password = document.getElementById("registerPassword").value;
   const confirmPass = document.getElementById("confirmPassword").value;
   const privacyPolicyChecked = document.getElementById("privacyPolicy").checked;
@@ -93,7 +94,7 @@ async function register() {
     const response = await fetch("http://localhost:5000/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, birthday: dob }),
+      body: JSON.stringify({ username, email, password, birthday: dob })  // ✅ Include email
     });
 
     const result = await response.json();
@@ -109,6 +110,7 @@ async function register() {
     alert("Error connecting to server.");
   }
 }
+
 /****************************************
  *          Navigation Logic
  ****************************************/
