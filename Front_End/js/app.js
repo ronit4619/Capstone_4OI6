@@ -189,6 +189,22 @@ function clearUploadPreview() {
   video.src = "";
   document.getElementById("fileInput").value = "";
 }
+// Change Password Function
+function changePassword() {
+  let newPassword = prompt("Enter your new password:");
+  if (newPassword) {
+      alert("Password changed successfully! (Implement backend call here)");
+  }
+}
+
+// Delete Account Function
+function deleteAccount() {
+  let confirmDelete = confirm("Are you sure you want to delete your account? This action is irreversible!");
+  if (confirmDelete) {
+      alert("Account deleted! (Implement backend call here)");
+      logout(); // Log out after deletion
+  }
+}
 
 /****************************************
  *  Stop camera on page unload (optional)
