@@ -3,6 +3,8 @@ const API_URL = "http://localhost:5000"; // Change if running on a different hos
 /****************************************
  *          Authentication Logic
  ****************************************/
+
+// ✅ Stop camera function
 function stopCamera() {
   let video = document.getElementById('videoFeed');
   if (video && video.srcObject) {
@@ -13,9 +15,7 @@ function stopCamera() {
   }
 }
 
-
-
-
+// ✅ Switch between Login and Register
 function showRegister() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("registerBox").classList.remove("hidden");
@@ -42,10 +42,14 @@ async function login() {
 
     if (response.ok) {
       localStorage.setItem("jwtToken", result.token);
+      localStorage.setItem("loggedInUser", username); // Store username
+
       alert("Login successful!");
+      
       document.getElementById("authContainer").style.display = "none";
       document.getElementById("dashboard").style.display = "block";
-      showMainMenu();
+
+      updateWelcomeMessage(); // Call function to update username display
     } else {
       alert(result.message);
     }
@@ -54,14 +58,47 @@ async function login() {
   }
 }
 
+// ✅ Update welcome message with username
+function updateWelcomeMessage() {
+  const username = localStorage.getItem("loggedInUser");
+  if (username) {
+    document.getElementById("welcomeMessage").innerText = `Welcome, ${username}! 🏀`;
+  } else {
+    document.getElementById("welcomeMessage").innerText = "Welcome! 🏀";
+  }
+}
+
+// ✅ Auto-load dashboard if logged in (on page refresh)
+document.addEventListener("DOMContentLoaded", () => {
+  if (localStorage.getItem("jwtToken")) {
+    document.getElementById("authContainer").style.display = "none";
+    document.getElementById("dashboard").style.display = "block";
+    updateWelcomeMessage();
+  } else {
+    document.getElementById("authContainer").style.display = "flex";
+    document.getElementById("dashboard").style.display = "none";
+  }
+});
+
 // ✅ Logout Function
 function logout() {
-  localStorage.removeItem("jwtToken");
-  stopCamera();
+  localStorage.removeItem("jwtToken"); 
+  localStorage.removeItem("loggedInUser"); // Clear stored username
+
+  stopCamera(); 
   clearUploadPreview();
+  
+  // Show login screen and hide dashboard
   document.getElementById("authContainer").style.display = "flex";
   document.getElementById("dashboard").style.display = "none";
-  showMainMenu();
+
+  // Reset welcome message to default
+  document.getElementById("welcomeMessage").innerText = "Welcome! 🏀";
+
+  // Ensure the main menu is reset
+  if (document.getElementById("mainMenu")) {
+    showMainMenu();
+  }
 }
 
 /****************************************
@@ -69,6 +106,7 @@ function logout() {
  ****************************************/
 async function register() {
   const username = document.getElementById("registerUsername").value;
+  const email = document.getElementById("registerEmail").value;  // Get email from input
   const password = document.getElementById("registerPassword").value;
   const confirmPass = document.getElementById("confirmPassword").value;
   const privacyPolicyChecked = document.getElementById("privacyPolicy").checked;
@@ -90,10 +128,10 @@ async function register() {
   }
 
   try {
-    const response = await fetch("http://localhost:5000/register", {
+    const response = await fetch(`${API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password, birthday: dob }),
+      body: JSON.stringify({ username, email, password, birthday: dob })  // ✅ Include email
     });
 
     const result = await response.json();
@@ -109,6 +147,7 @@ async function register() {
     alert("Error connecting to server.");
   }
 }
+
 /****************************************
  *          Navigation Logic
  ****************************************/
