@@ -16,6 +16,10 @@
 /*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
 
 --
+-- Dumping events for database 'cp_ball'
+--
+
+--
 -- Dumping routines for database 'cp_ball'
 --
 /*!50003 DROP PROCEDURE IF EXISTS `changePassword` */;
@@ -33,6 +37,7 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `changePassword`(
     IN p_new_password VARCHAR(255)
 )
 BEGIN
+    -- Update password with new hashed value
     UPDATE users 
     SET password = p_new_password
     WHERE userID = p_userID;
@@ -42,7 +47,7 @@ DELIMITER ;
 /*!50003 SET character_set_client  = @saved_cs_client */ ;
 /*!50003 SET character_set_results = @saved_cs_results */ ;
 /*!50003 SET collation_connection  = @saved_col_connection */ ;
-/*!50003 DROP PROCEDURE IF EXISTS `deleteUser` */;
+/*!50003 DROP PROCEDURE IF EXISTS `deleteAccount` */;
 /*!50003 SET @saved_cs_client      = @@character_set_client */ ;
 /*!50003 SET @saved_cs_results     = @@character_set_results */ ;
 /*!50003 SET @saved_col_connection = @@collation_connection */ ;
@@ -52,10 +57,11 @@ DELIMITER ;
 /*!50003 SET @saved_sql_mode       = @@sql_mode */ ;
 /*!50003 SET sql_mode              = 'ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION' */ ;
 DELIMITER ;;
-CREATE DEFINER=`root`@`localhost` PROCEDURE `deleteUser`(
+CREATE DEFINER=`root`@`localhost` PROCEDURE `deleteAccount`(
     IN p_userID INT
 )
 BEGIN
+    -- Delete user account
     DELETE FROM users WHERE userID = p_userID;
 END ;;
 DELIMITER ;
@@ -101,8 +107,39 @@ CREATE DEFINER=`root`@`localhost` PROCEDURE `storeUser`(
     IN p_birthday DATE
 )
 BEGIN
+    -- Declare variable for age
+    DECLARE user_age INT;
+
+    -- Trim email input and convert empty strings to NULL
+    SET p_email = NULLIF(TRIM(p_email), '');
+
+    -- Calculate user's age
+    SET user_age = TIMESTAMPDIFF(YEAR, p_birthday, CURDATE());
+
+    -- Reject users younger than 13
+    IF user_age < 13 THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'User must be at least 13 years old to register';
+    END IF;
+
+    -- Check if the username already exists
+    IF EXISTS (SELECT 1 FROM users WHERE username = p_username) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Username already exists';
+    END IF;
+
+    -- Check if the email already exists (only if NOT NULL)
+    IF p_email IS NOT NULL THEN
+        IF EXISTS (SELECT 1 FROM users WHERE email = p_email) THEN
+            SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Email already exists';
+        END IF;
+    END IF;
+
+    -- Insert the new user
     INSERT INTO users (username, password, email, birthday)
     VALUES (p_username, p_password, p_email, p_birthday);
+    
 END ;;
 DELIMITER ;
 /*!50003 SET sql_mode              = @saved_sql_mode */ ;
@@ -141,4 +178,4 @@ DELIMITER ;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
 /*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
 
--- Dump completed on 2025-02-23 14:25:58
+-- Dump completed on 2025-02-27 18:07:58
