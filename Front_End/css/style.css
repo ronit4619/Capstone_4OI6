@@ -213,3 +213,101 @@ button:hover {
 .hidden {
     display: none;
 }
+
+/* Improve the welcome text visibility */
+.welcome-text {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: white !important; /* Force white text */
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Improve contrast */
+    margin-top: 20px;
+    position: relative;
+    z-index: 10; /* Make sure it's not hidden behind other elements */
+}
+/* User Dropdown Styling */
+.user-dropdown {
+    position: absolute; /* Prevents shifting content */
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+}
+
+/* Account Button */
+.user-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+.user-btn:hover {
+    background: #b52d3a;
+}
+
+/* Dropdown Content */
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    min-width: 180px;
+    overflow: hidden;
+}
+
+/* Dropdown Buttons */
+.dropdown-content button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: white;
+    color: black;
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+}
+
+.dropdown-content button:hover {
+    background: #f5f5f5;
+}
+
+/* Show Dropdown on Hover */
+.user-dropdown:hover .dropdown-content {
+    display: block;
+}
+
+/* Main Menu (Live Analysis & Upload Session) */
+.main-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    padding: 20px;
+}
+
+.option-button {
+    width: 300px;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: none;
+    font-size: 24px;
+    color: #ff6b35;
+}
+
+.option-button:hover {
+    transform: translateY(-5px);
+}

@@ -27,7 +27,9 @@ db.connect((err) => {
 });
 
 // JWT Secret Key
-const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret"; 
+console.log("Loaded JWT_SECRET:", JWT_SECRET);
+
 
 // Hash password function
 const hashPassword = async (password) => {
@@ -37,15 +39,27 @@ const hashPassword = async (password) => {
 
 // Middleware to verify JWT Token
 const authenticateToken = (req, res, next) => {
-  const token = req.header("Authorization");
-  if (!token) return res.status(401).json({ message: "Access Denied" });
+  const authHeader = req.header("Authorization");
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "Access Denied: No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  console.log("Extracted Token:", token); // Debugging
 
   jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) return res.status(403).json({ message: "Invalid Token" });
+    if (err) {
+      console.error("JWT Verification Error:", err); // Debugging
+      return res.status(403).json({ message: "Invalid Token" });
+    }
+
+    console.log("Decoded User:", user); // Debugging
     req.user = user;
     next();
   });
 };
+
 
 // 📝 **Register a User (Using `storeUser` Procedure)**
 app.post("/register", async (req, res) => {
@@ -74,7 +88,6 @@ app.post("/register", async (req, res) => {
 
   
 
-// 🔐 **Login a User (Using `getUserByUsername` Procedure)**
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
 
@@ -95,9 +108,12 @@ app.post("/login", (req, res) => {
       expiresIn: "1h",
     });
 
+    console.log("Generated Token:", token); // ✅ Debugging
+
     res.json({ message: "Login successful", token });
   });
 });
+
 
 // 🔒 **Get User Profile (Protected Route)**
 app.get("/profile", authenticateToken, (req, res) => {
@@ -108,7 +124,59 @@ app.get("/profile", authenticateToken, (req, res) => {
   });
 });
 
-// 🚀 Start Server
+// ✅ API Route for Changing Password
+app.post("/change-password", authenticateToken, (req, res) => {
+    const { oldPassword, newPassword } = req.body;
+    const userId = req.user.userID; // Ensure this matches your stored procedure
+
+    console.log("User ID Received:", userId);
+
+    if (!oldPassword || !newPassword) {
+        return res.status(400).json({ message: "Both old and new passwords are required." });
+    }
+
+    // Fetch stored hashed password
+    db.query("SELECT password FROM users WHERE userID = ?", [userId], async (err, results) => {
+        if (err) {
+            console.error("❌ Database Error:", err);
+            return res.status(500).json({ message: "Database error." });
+        }
+
+        if (results.length === 0) {
+            return res.status(404).json({ message: "User not found." });
+        }
+
+        const storedPassword = results[0].password;
+
+        try {
+            // Compare old password with stored bcrypt hash
+            const isMatch = await bcrypt.compare(oldPassword, storedPassword);
+            if (!isMatch) {
+                return res.status(400).json({ message: "Old password is incorrect." });
+            }
+
+            // Hash the new password
+            const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+            // Update password using the stored procedure
+            db.query("CALL changePassword(?, ?)", [userId, hashedNewPassword], (err, result) => {
+                if (err) {
+                    console.error("❌ Error updating password:", err);
+                    return res.status(500).json({ message: "Error updating password." });
+                }
+
+                console.log("✅ Password changed successfully!");
+                return res.json({ message: "Password changed successfully!", redirect: "file:///C:/Users/antho/OneDrive/Desktop/Year%205/Capstone/Capstone_4OI6/Front_End/index.html" }); /// have to be changed in the futue
+            });
+
+        } catch (error) {
+            console.error("❌ Server Error:", error);
+            return res.status(500).json({ message: "Internal server error." });
+        }
+    });
+});
+
+//🚀 Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`✅ Server running on http://localhost:${PORT}`);

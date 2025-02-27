@@ -44,6 +44,10 @@ async function login() {
       localStorage.setItem("jwtToken", result.token);
       localStorage.setItem("loggedInUser", username); // Store username
 
+      console.log("Stored Token:", localStorage.getItem("jwtToken")); // ✅ Debugging
+      console.log("Stored User:", localStorage.getItem("loggedInUser")); // ✅ Debugging
+
+
       alert("Login successful!");
       
       document.getElementById("authContainer").style.display = "none";
@@ -189,21 +193,18 @@ function clearUploadPreview() {
   video.src = "";
   document.getElementById("fileInput").value = "";
 }
-// Change Password Function
-function changePassword() {
-  let newPassword = prompt("Enter your new password:");
-  if (newPassword) {
-      alert("Password changed successfully! (Implement backend call here)");
-  }
-}
 
 // Delete Account Function
 function deleteAccount() {
-  let confirmDelete = confirm("Are you sure you want to delete your account? This action is irreversible!");
+  let confirmDelete = confirm("Are ySou sure you want to delete your account? This action is irreversible!");
   if (confirmDelete) {
       alert("Account deleted! (Implement backend call here)");
       logout(); // Log out after deletion
   }
+}
+
+function changePassword() {
+  window.location.href = "change-password.html";
 }
 
 /****************************************
