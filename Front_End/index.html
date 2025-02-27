@@ -72,7 +72,11 @@
       <button class="user-btn">⚙️ Account</button>
       <div class="dropdown-content">
           <button onclick="changePassword()">Change Password</button>
-          <button onclick="deleteAccount()">Delete Account</button>
+         <!-- Delete Account Button -->
+          <button onclick="window.location.href='delete-account.html'" class="danger-button">
+            Delete Account
+          </button>
+
           <button onclick="logout()">Logout</button>
       </div>
   </div>

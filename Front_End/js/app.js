@@ -194,14 +194,7 @@ function clearUploadPreview() {
   document.getElementById("fileInput").value = "";
 }
 
-// Delete Account Function
-function deleteAccount() {
-  let confirmDelete = confirm("Are ySou sure you want to delete your account? This action is irreversible!");
-  if (confirmDelete) {
-      alert("Account deleted! (Implement backend call here)");
-      logout(); // Log out after deletion
-  }
-}
+// Delete Account Functio
 
 function changePassword() {
   window.location.href = "change-password.html";

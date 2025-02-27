@@ -176,6 +176,58 @@ app.post("/change-password", authenticateToken, (req, res) => {
     });
 });
 
+
+//🔒 **Delete Account (Protected Route)** 
+
+app.delete("/delete-account", authenticateToken, async (req, res) => {
+    const { password } = req.body;
+    const userId = req.user.userID; // Ensure correct user is deleting their account
+
+    console.log("User ID Requesting Deletion:", userId);
+
+    if (!password) {
+        return res.status(400).json({ message: "Password is required for account deletion." });
+    }
+
+    try {
+        // Retrieve stored hashed password
+        db.query("SELECT password FROM users WHERE userID = ?", [userId], async (err, results) => {
+            if (err) {
+                console.error("❌ Database Error:", err);
+                return res.status(500).json({ message: "Database error." });
+            }
+
+            if (results.length === 0) {
+                return res.status(404).json({ message: "User not found." });
+            }
+
+            const storedPassword = results[0].password;
+
+            // Compare entered password with stored bcrypt hash
+            const isMatch = await bcrypt.compare(password, storedPassword);
+            if (!isMatch) {
+                return res.status(400).json({ message: "Incorrect password. Account not deleted." });
+            }
+
+            // Call the `deleteAccount` stored procedure
+            db.query("CALL deleteAccount(?)", [userId], (err, result) => {
+                if (err) {
+                    console.error("❌ Error deleting account:", err);
+                    return res.status(500).json({ message: "Error deleting account." });
+                }
+
+                console.log("✅ Account deleted successfully!");
+                res.json({ message: "Your account has been deleted successfully.", redirect: "index.html" });
+            });
+        });
+
+    } catch (error) {
+        console.error("❌ Server Error:", error);
+        res.status(500).json({ message: "Internal server error." });
+    }
+});
+
+
 //🚀 Start Server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {

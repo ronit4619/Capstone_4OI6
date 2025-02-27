@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Delete Account</title>
+  <link rel="stylesheet" href="css/delete-account.css"> <!-- New CSS file -->
+</head>
+<body>
+
+  <!-- Delete Account Container -->
+  <div class="auth-container">
+    <div class="auth-box">
+      <h2 style="text-align: center; color: #ff6b35;">Delete Account</h2>
+      <p style="text-align: center; color: #b22222; font-weight: bold;">⚠️ This action is irreversible. You will lose all your data.</p>
+
+      <form id="deleteAccountForm" class="auth-form">
+        <input type="password" placeholder="Enter Password" id="password" required>
+        <input type="password" placeholder="Confirm Password" id="confirmPassword" required>
+
+        <label class="checkbox-label">
+          <input type="checkbox" id="confirmCheckbox"> 
+          I understand that deleting my account is permanent.
+        </label>
+
+        <button type="submit" class="danger-button">Delete Account</button>
+      </form>
+
+      <div style="text-align: center; margin-top: 1rem;">
+        <a href="index.html" style="color: #ff6b35; text-decoration: underline;">Cancel</a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/delete-account.js"></script>
+</body>
+</html>
