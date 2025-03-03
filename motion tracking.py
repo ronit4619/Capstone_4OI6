@@ -3,7 +3,7 @@ import math
 import time
 import numpy as np
 import mediapipe as mp
-from ultralytics import YOLO        # For YOLO detection
+from ultralytics import YOLO
 import cvzone
 
 # ------------------- 1) Custom Pose Detector -------------------
@@ -106,11 +106,11 @@ def check_release_point(shoulder, elbow, wrist):
 def analyze_shot(lmList, prev_wrist, prev_time, frame):
     """
     Analyzes the shot using the extracted 2D landmarks from the poseDetector.
-    Returns: (set_position, one_motion, release_point, speed, current_wrist, current_time)
+    Returns: (set_position, one_motion, release_point, speed, current_wrist, current_time, arm_angle)
     """
     if len(lmList) < 16:
         # Not enough landmarks for left shoulder/elbow/wrist
-        return False, False, False, 0.0, prev_wrist, time.time()
+        return False, False, False, 0.0, prev_wrist, time.time(), 0.0
 
     # MediaPipe indices: 11->Left Shoulder, 13->Left Elbow, 15->Left Wrist
     left_shoulder = (lmList[11][1], lmList[11][2])
@@ -125,7 +125,10 @@ def analyze_shot(lmList, prev_wrist, prev_time, frame):
     time_elapsed = current_time - prev_time
     speed = calculate_speed(prev_wrist, left_wrist, time_elapsed)
 
-    return set_position, one_motion_flag, release_point, speed, left_wrist, current_time
+    # Calculate arm angle at the elbow
+    arm_angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
+
+    return set_position, one_motion_flag, release_point, speed, left_wrist, current_time, arm_angle
 
 # ------------------- 4) YOLO Basketball Detection -------------------
 def detect_basketball(model, frame):
@@ -144,8 +147,7 @@ def main():
       - Default Mode: Only player & ball detection (no ball tracking)
       - Ball Tracking Mode: Toggled with 'S'. In this mode, the ball is detected using YOLO,
         and its center is stored to track the ball's path. Polynomial regression is applied to draw
-        the trajectory, and a simple basket prediction is made (based on the method described in
-        https://medium.com/@hichengkang/basketball-tracking-opencv-6482e48bc2b2).
+        the trajectory, and a simple basket prediction is made.
         * Press 'R' (while in ball tracking mode) to purge the existing tracking data.
         * Press 'S' again to toggle ball tracking mode off.
     """
@@ -200,8 +202,9 @@ def main():
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
         # ------------------ Shooting Form Analysis (Pose) ------------------
+        arm_angle = 0.0  # Default value if no landmarks are detected
         if len(lmList) >= 16:
-            set_ok, one_motion_flag, release_ok, speed, prev_wrist, prev_time = analyze_shot(
+            set_ok, one_motion_flag, release_ok, speed, prev_wrist, prev_time, arm_angle = analyze_shot(
                 lmList, prev_wrist, prev_time, frame
             )
 
@@ -229,46 +232,39 @@ def main():
             cv2.putText(frame, f"Wrist Speed: {speed:.2f} px/sec", (10, 120),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
 
+        # Always display the arm angle
+        cv2.putText(frame, f"Arm Angle: {arm_angle:.2f} degrees", (10, 150),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+
         # ------------------ Ball Tracking (only if ball_tracking_mode is ON) ------------------
         if ball_tracking_mode:
-            # Use YOLO detection to get the ball's bounding box for tracking.
             ball_box_for_tracking = detect_basketball(basketball_model, frame)
             center_yolo = None
             if ball_box_for_tracking:
                 x_min, y_min, x_max, y_max = ball_box_for_tracking
-                # Compute the center of the bounding box.
                 center_yolo = (int((x_min + x_max) / 2), int((y_min + y_max) / 2))
-                # Optionally, draw a small circle at the center.
                 cv2.circle(frame, center_yolo, 5, (0, 0, 255), -1)
             
-            # If a valid center is detected, update the tracking lists.
             if center_yolo is not None:
                 posListX.append(center_yolo[0])
                 posListY.append(center_yolo[1])
             
-            # Draw the ball's trajectory if enough points are collected.
             if len(posListX) >= 3:
-                # Apply polynomial regression to fit a quadratic curve: y = Ax^2 + Bx + C
                 A, B, C = np.polyfit(posListX, posListY, 2)
-                
-                # Draw the actual ball path (tracked points)
                 for i, (posX, posY) in enumerate(zip(posListX, posListY)):
                     cv2.circle(frame, (posX, posY), 10, (0, 255, 0), cv2.FILLED)
                     if i > 0:
                         cv2.line(frame, (posListX[i - 1], posListY[i - 1]), (posX, posY), (0, 255, 0), 2)
                 
-                # Draw the predicted trajectory (a parabola) based on the regression.
                 for x in range(0, frame.shape[1], 10):
                     y = int(A * (x ** 2) + B * x + C)
                     cv2.circle(frame, (x, y), 2, (255, 0, 255), cv2.FILLED)
                 
-                # Basket prediction logic:
-                # Shift the polynomial downward to roughly match the hoop's vertical position.
-                a, b, c = A, B, C - 590  # Adjust the value 590 as needed for your setup.
+                a, b, c = A, B, C - 590
                 discriminant = b ** 2 - 4 * a * c
                 if discriminant >= 0:
                     x_pred = int((-b - math.sqrt(discriminant)) / (2 * a))
-                    prediction = 330 < x_pred < 430  # Adjust the hoop's x-range as needed.
+                    prediction = 330 < x_pred < 430
                 else:
                     prediction = False
 
@@ -301,13 +297,11 @@ def main():
         if key == ord('q'):
             break
         elif key == ord('s'):
-            # Toggle ball tracking mode on/off and clear tracking data.
             ball_tracking_mode = not ball_tracking_mode
             posListX.clear()
             posListY.clear()
             print("Ball tracking mode ENABLED." if ball_tracking_mode else "Ball tracking mode DISABLED.")
         elif key == ord('r'):
-            # In ball tracking mode, pressing 'r' purges the existing tracking data.
             if ball_tracking_mode:
                 posListX.clear()
                 posListY.clear()
