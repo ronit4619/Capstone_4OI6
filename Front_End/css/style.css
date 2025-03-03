@@ -24,9 +24,11 @@ body {
 .auth-container {
     display: flex;
     justify-content: center;
-    align-items: center;
+    align-items: flex-start; /* Aligns the login box higher */
     height: 100vh;
+    padding-top: 5vh; /* Adjust this value to move it higher */
 }
+
 
 .auth-box {
     background: rgba(255, 255, 255, 0.95);
@@ -310,4 +312,17 @@ button:hover {
 
 .option-button:hover {
     transform: translateY(-5px);
+}
+
+.logo-container {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 5rem;
+    margin-top: 5rem;
+}
+
+.logo {
+    width: 200px; /* Adjust size as needed */
+    height: auto;
+    border-radius: 50%; /* Optional: makes the logo circular */
 }
