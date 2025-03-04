@@ -9,3 +9,9 @@
 /.vscode
 output_videos/output_video.avi
 stubs/track_stubs.pkl
+Front_End/js/node_modules/.bin/bcrypt
+*.cmd
+*.ps1
+/Front_End/js/node_modules
+/Front_End/js/package-lock.json
+/Front_End/js/package.json
