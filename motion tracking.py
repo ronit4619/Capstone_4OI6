@@ -3,7 +3,7 @@ import math
 import time
 import numpy as np
 import mediapipe as mp
-from ultralytics import YOLO
+from ultralytics import YOLO        # For YOLO detection
 import cvzone
 
 # ------------------- 1) Custom Pose Detector -------------------
@@ -103,32 +103,29 @@ def check_release_point(shoulder, elbow, wrist):
     release_angle = calculate_angle(shoulder, elbow, wrist)
     return 30 <= release_angle <= 60  # Adjust as needed
 
-def analyze_shot(lmList, prev_wrist, prev_time, frame):
+def analyze_shot(lmList, prev_wrist, prev_time):
     """
     Analyzes the shot using the extracted 2D landmarks from the poseDetector.
-    Returns: (set_position, one_motion, release_point, speed, current_wrist, current_time, arm_angle)
+    Returns: (set_position_ok, one_motion_ok, release_point_ok, speed, current_wrist, current_time)
     """
     if len(lmList) < 16:
         # Not enough landmarks for left shoulder/elbow/wrist
-        return False, False, False, 0.0, prev_wrist, time.time(), 0.0
+        return False, False, False, 0.0, prev_wrist, time.time()
 
     # MediaPipe indices: 11->Left Shoulder, 13->Left Elbow, 15->Left Wrist
     left_shoulder = (lmList[11][1], lmList[11][2])
     left_elbow = (lmList[13][1], lmList[13][2])
     left_wrist = (lmList[15][1], lmList[15][2])
 
-    set_position = check_set_position(left_shoulder, left_elbow, left_wrist)
-    one_motion_flag = is_one_motion(left_wrist, prev_wrist)
-    release_point = check_release_point(left_shoulder, left_elbow, left_wrist)
+    set_position_ok = check_set_position(left_shoulder, left_elbow, left_wrist)
+    one_motion_ok = is_one_motion(left_wrist, prev_wrist)
+    release_point_ok = check_release_point(left_shoulder, left_elbow, left_wrist)
 
     current_time = time.time()
     time_elapsed = current_time - prev_time
     speed = calculate_speed(prev_wrist, left_wrist, time_elapsed)
 
-    # Calculate arm angle at the elbow
-    arm_angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
-
-    return set_position, one_motion_flag, release_point, speed, left_wrist, current_time, arm_angle
+    return set_position_ok, one_motion_ok, release_point_ok, speed, left_wrist, current_time
 
 # ------------------- 4) YOLO Basketball Detection -------------------
 def detect_basketball(model, frame):
@@ -140,16 +137,20 @@ def detect_basketball(model, frame):
             return (x_min, y_min, x_max, y_max)
     return None
 
-# ------------------- 5) Main Program with Mode Selection -------------------
+# ------------------- 5) Main Program with Feature Toggles -------------------
 def main():
     """
-    Main live camera loop that supports two modes:
-      - Default Mode: Only player & ball detection (no ball tracking)
-      - Ball Tracking Mode: Toggled with 'S'. In this mode, the ball is detected using YOLO,
-        and its center is stored to track the ball's path. Polynomial regression is applied to draw
-        the trajectory, and a simple basket prediction is made.
-        * Press 'R' (while in ball tracking mode) to purge the existing tracking data.
-        * Press 'S' again to toggle ball tracking mode off.
+    Main live camera loop that supports toggles via numeric keys:
+      1) Set Position
+      2) One Motion
+      3) Release Point
+      4) Speed
+      5) Ball Tracking
+      6) Arm Angles
+    All features except ball tracking start enabled by default.
+    
+    Press 'r' to reset ball tracking data (if ball tracking is ON).
+    Press 'q' to quit.
     """
     # 1) Load your YOLO model
     model_path = r"C:\Users\biswa\Downloads\best.pt"  # Update this path as needed
@@ -166,14 +167,19 @@ def main():
         min_tracking_confidence=0.5
     )
 
-    # 3) Initialize lists to store ball tracking positions (for polynomial regression)
+    # 3) Ball tracking data
     posListX, posListY = [], []
     prediction = False
 
-    # --- Mode flag ---
-    ball_tracking_mode = False     # Default: OFF (no ball tracking)
+    # --- Feature Toggles ---
+    set_position_enabled = True
+    one_motion_enabled = True
+    release_point_enabled = True
+    speed_enabled = True
+    ball_tracking_mode = False  # Off by default
+    arm_angles_enabled = True
 
-    # 4) Open the Webcam (live usage)
+    # 4) Open the Webcam
     cap = cv2.VideoCapture(0)
     prev_wrist = None
     prev_time = time.time()
@@ -201,44 +207,66 @@ def main():
             cv2.putText(frame, "Basketball", (x_min, y_min - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
 
-        # ------------------ Shooting Form Analysis (Pose) ------------------
-        arm_angle = 0.0  # Default value if no landmarks are detected
+        # ------------------ Shot Analysis ------------------
         if len(lmList) >= 16:
-            set_ok, one_motion_flag, release_ok, speed, prev_wrist, prev_time, arm_angle = analyze_shot(
-                lmList, prev_wrist, prev_time, frame
-            )
+            (set_ok, one_motion_ok, release_ok, speed, 
+             prev_wrist, prev_time) = analyze_shot(lmList, prev_wrist, prev_time)
 
-            if set_ok:
-                cv2.putText(frame, "Set Position: OK", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            else:
-                cv2.putText(frame, "Set Position: Adjust your shoulder/elbow", (10, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            # Display toggled analyses
+            y_offset = 30
+            if set_position_enabled:
+                if set_ok:
+                    cv2.putText(frame, "Set Position: OK", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    cv2.putText(frame, "Set Position: Adjust", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                y_offset += 30
 
-            if one_motion_flag:
-                cv2.putText(frame, "Motion: Smooth", (10, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            else:
-                cv2.putText(frame, "Motion: Improve your release", (10, 60),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if one_motion_enabled:
+                if one_motion_ok:
+                    cv2.putText(frame, "One Motion: Smooth", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    cv2.putText(frame, "One Motion: Improve", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                y_offset += 30
 
-            if release_ok:
-                cv2.putText(frame, "Release: Good!", (10, 90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-            else:
-                cv2.putText(frame, "Release: Adjust angle", (10, 90),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+            if release_point_enabled:
+                if release_ok:
+                    cv2.putText(frame, "Release: Good!", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+                else:
+                    cv2.putText(frame, "Release: Adjust angle", (10, y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                y_offset += 30
 
-            cv2.putText(frame, f"Wrist Speed: {speed:.2f} px/sec", (10, 120),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+            if speed_enabled:
+                cv2.putText(frame, f"Wrist Speed: {speed:.2f} px/sec", (10, y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 2)
+                y_offset += 30
 
-        # Always display the arm angle
-        cv2.putText(frame, f"Arm Angle: {arm_angle:.2f} degrees", (10, 150),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
+        # ------------------ Arm Angle Tracking ------------------
+        if arm_angles_enabled and len(lmList) >= 17:
+            # Left arm: landmarks 11 (shoulder), 13 (elbow), 15 (wrist)
+            left_shoulder = (lmList[11][1], lmList[11][2])
+            left_elbow = (lmList[13][1], lmList[13][2])
+            left_wrist = (lmList[15][1], lmList[15][2])
+            left_arm_angle = calculate_angle(left_shoulder, left_elbow, left_wrist)
+            cv2.putText(frame, f"Left Arm: {int(left_arm_angle)} deg", (10, 210),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
 
-        # ------------------ Ball Tracking (only if ball_tracking_mode is ON) ------------------
+            # Right arm: landmarks 12 (shoulder), 14 (elbow), 16 (wrist)
+            right_shoulder = (lmList[12][1], lmList[12][2])
+            right_elbow = (lmList[14][1], lmList[14][2])
+            right_wrist = (lmList[16][1], lmList[16][2])
+            right_arm_angle = calculate_angle(right_shoulder, right_elbow, right_wrist)
+            cv2.putText(frame, f"Right Arm: {int(right_arm_angle)} deg", (10, 240),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 2)
+
+        # ------------------ Ball Tracking (if toggled ON) ------------------
         if ball_tracking_mode:
-            ball_box_for_tracking = detect_basketball(basketball_model, frame)
+            ball_box_for_tracking = basketball_box  # We already have it from detect_basketball
             center_yolo = None
             if ball_box_for_tracking:
                 x_min, y_min, x_max, y_max = ball_box_for_tracking
@@ -250,21 +278,26 @@ def main():
                 posListY.append(center_yolo[1])
             
             if len(posListX) >= 3:
+                # Polynomial fit: y = Ax^2 + Bx + C
                 A, B, C = np.polyfit(posListX, posListY, 2)
+                
+                # Draw the actual ball path
                 for i, (posX, posY) in enumerate(zip(posListX, posListY)):
                     cv2.circle(frame, (posX, posY), 10, (0, 255, 0), cv2.FILLED)
                     if i > 0:
                         cv2.line(frame, (posListX[i - 1], posListY[i - 1]), (posX, posY), (0, 255, 0), 2)
                 
+                # Draw the predicted parabola
                 for x in range(0, frame.shape[1], 10):
                     y = int(A * (x ** 2) + B * x + C)
                     cv2.circle(frame, (x, y), 2, (255, 0, 255), cv2.FILLED)
                 
-                a, b, c = A, B, C - 590
+                # Simple basket prediction
+                a, b, c = A, B, C - 590  # Adjust 590 as needed
                 discriminant = b ** 2 - 4 * a * c
                 if discriminant >= 0:
                     x_pred = int((-b - math.sqrt(discriminant)) / (2 * a))
-                    prediction = 330 < x_pred < 430
+                    prediction = 330 < x_pred < 430  # Adjust the hoop's x-range as needed
                 else:
                     prediction = False
 
@@ -274,38 +307,67 @@ def main():
                 else:
                     cvzone.putTextRect(frame, "No Basket", (50, 150), scale=3,
                                        thickness=3, colorR=(0, 0, 200), offset=20)
-        # ------------------ End Ball Tracking ------------------
-       
-        # Determine which mode text to display
-        if ball_tracking_mode:
-            mode_text = "Ball Tracking Mode"
-        else:
-            mode_text = "Default Mode"
 
-        (text_width, text_height), _ = cv2.getTextSize(mode_text, cv2.FONT_HERSHEY_SIMPLEX, 1, 2)
-        frame_width = frame.shape[1]
-        text_x = frame_width - text_width - 10
+        # ------------------ Display Active Features in Top-Right ------------------
+        active_features = []
+        if set_position_enabled:   active_features.append("set_position")
+        if one_motion_enabled:     active_features.append("one_motion")
+        if release_point_enabled:  active_features.append("release_point")
+        if speed_enabled:          active_features.append("speed")
+        if arm_angles_enabled:     active_features.append("arm_angles")
+        if ball_tracking_mode:     active_features.append("ball_tracking")
+
+        # Combine into a string
+        feature_text = "Active: " + ", ".join(active_features) if active_features else "Active: None"
+
+        # Put text in the top-right corner
+        (text_width, text_height), _ = cv2.getTextSize(feature_text, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
+        text_x = frame.shape[1] - text_width - 10
         text_y = text_height + 10
+        cv2.putText(frame, feature_text, (text_x, text_y),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
-        cv2.putText(frame, mode_text, (text_x, text_y), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
+        # ------------------ Show the frame ------------------
         cv2.imshow(window_name, frame)
 
         # --------------- Key handling ---------------
-        key = cv2.waitKey(100) & 0xFF
+        key = cv2.waitKey(50) & 0xFF
         if key == ord('q'):
             break
-        elif key == ord('s'):
+
+        elif key == ord('1'):
+            set_position_enabled = not set_position_enabled
+            print("Set Position toggled:", set_position_enabled)
+
+        elif key == ord('2'):
+            one_motion_enabled = not one_motion_enabled
+            print("One Motion toggled:", one_motion_enabled)
+
+        elif key == ord('3'):
+            release_point_enabled = not release_point_enabled
+            print("Release Point toggled:", release_point_enabled)
+
+        elif key == ord('4'):
+            speed_enabled = not speed_enabled
+            print("Speed toggled:", speed_enabled)
+
+        elif key == ord('5'):
+            # Toggle ball tracking mode on/off and clear tracking data
             ball_tracking_mode = not ball_tracking_mode
             posListX.clear()
             posListY.clear()
             print("Ball tracking mode ENABLED." if ball_tracking_mode else "Ball tracking mode DISABLED.")
+
+        elif key == ord('6'):
+            arm_angles_enabled = not arm_angles_enabled
+            print("Arm Angles toggled:", arm_angles_enabled)
+
         elif key == ord('r'):
+            # Reset ball tracking data if currently enabled
             if ball_tracking_mode:
                 posListX.clear()
                 posListY.clear()
-                print("Ball tracking data purged. Restarting ball tracking.")
+                print("Ball tracking data purged.")
 
     cap.release()
     cv2.destroyAllWindows()
