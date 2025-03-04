@@ -6,6 +6,6 @@
 /runs
 /stubs
 /output_videos
-/vscode
+/.vscode
 output_videos/output_video.avi
 stubs/track_stubs.pkl
