@@ -8,7 +8,7 @@ mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
 # Load the YOLO model
-model = YOLO('best.pt')
+model = YOLO('basketball_and_hoop.pt')
 
 def calculate_angle(landmarks, limb_to_scan):
     if limb_to_scan == "left_arm":
