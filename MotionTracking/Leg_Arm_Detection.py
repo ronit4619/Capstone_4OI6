@@ -8,7 +8,7 @@ mp_drawing = mp.solutions.drawing_utils
 mp_pose = mp.solutions.pose
 
 # Load the YOLO model
-model = YOLO('basketball.pt')
+model = YOLO('best.pt')
 
 def calculate_angle(landmarks, limb_to_scan):
     if limb_to_scan == "left_arm":
@@ -69,6 +69,16 @@ def is_basketball_in_frame(image, wrist):
 
     return basketball_detected
 
+def is_landmark_visible(landmark):
+    return 0 <= landmark.x <= 1 and 0 <= landmark.y <= 1
+
+def draw_text_with_background(image, text, position, font, font_scale, font_color, thickness, bg_color):
+    text_size, _ = cv2.getTextSize(text, font, font_scale, thickness)
+    text_w, text_h = text_size
+    x, y = position
+    cv2.rectangle(image, (x, y - text_h - 10), (x + text_w, y + 10), bg_color, -1)
+    cv2.putText(image, text, (x, y), font, font_scale, font_color, thickness)
+
 def main():
     while True:
         arm_to_scan = input("Which arm would you like to scan? (left/right/default): ").strip().lower()
@@ -101,56 +111,71 @@ def main():
                 if arm_to_scan in ["left", "right"]:
                     shoulder, elbow, wrist, angle = calculate_angle(landmarks, f"{arm_to_scan}_arm")
                     hip, knee, ankle, leg_angle = calculate_angle(landmarks, f"{arm_to_scan}_leg")
-                    if shoulder and elbow and wrist:
-                        cv2.putText(image, str(angle),
-                                    tuple(np.multiply(elbow, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
-                    if hip and knee and ankle:
-                        cv2.putText(image, str(leg_angle),
-                                    tuple(np.multiply(knee, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
 
-                    if prev_angle is None or abs(angle - prev_angle) >= angle_threshold:
-                        prev_angle = angle
+                    missing_landmarks = []
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_SHOULDER"].value]):
+                        missing_landmarks.append("Shoulder")
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_ELBOW"].value]):
+                        missing_landmarks.append("Elbow")
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_WRIST"].value]):
+                        missing_landmarks.append("Wrist")
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_HIP"].value]):
+                        missing_landmarks.append("Hip")
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_KNEE"].value]):
+                        missing_landmarks.append("Knee")
+                    if not is_landmark_visible(landmarks[mp_pose.PoseLandmark[f"{arm_to_scan.upper()}_ANKLE"].value]):
+                        missing_landmarks.append("Ankle")
 
-
-                    #add conditions for leg_angle to both angle status 100 to 140 DONE
-                    #add angle line interpolation for smoothness
-                    #update angle status indicator to Correct or Incorrect Shot Pose DONE
-                    #add distance req for person from camera before detecting
-                    if (60 <= angle <= 100) and (80 <= leg_angle <= 140) and is_basketball_in_frame(image, wrist):
-                        angle_status = "Pose: Correct"
-                        in_correct_pose = True
+                    if missing_landmarks:
+                        draw_text_with_background(image, f"Missing: {', '.join(missing_landmarks)}",
+                                                  (50, image.shape[0] - 50),  # Position at the bottom of the screen
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 1, (0, 0, 0))  # Smaller font size
                     else:
-                        angle_status = "Pose: Incorrect"
-                        if in_correct_pose and (angle > 135): #replace angle >135 to (is_basketball_in_frame(image, wrist)==False)
-                            shots += 1
-                            in_correct_pose = False
+                        if shoulder and elbow and wrist:
+                            draw_text_with_background(image, str(angle),
+                                                      tuple(np.multiply(elbow, [640, 480]).astype(int)),
+                                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
+                        if hip and knee and ankle:
+                            draw_text_with_background(image, str(leg_angle),
+                                                      tuple(np.multiply(knee, [640, 480]).astype(int)),
+                                                      cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
 
-                    cv2.putText(image, angle_status,
-                                (50, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if angle_status == "Pose: Correct" else (0, 0, 255), 2, cv2.LINE_AA)
+                        if prev_angle is None or abs(angle - prev_angle) >= angle_threshold:
+                            prev_angle = angle
 
-                    cv2.putText(image, f"Correct Shots: {shots}",
-                                (50, 100),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        if (60 <= angle <= 100) and (85 <= leg_angle <= 155) and is_basketball_in_frame(image, wrist):
+                            angle_status = "Pose: Correct"
+                            in_correct_pose = True
+                        else:
+                            angle_status = "Pose: Incorrect"
+                            if in_correct_pose and (angle > 135):  # replace angle >135 to (is_basketball_in_frame(image, wrist)==False)
+                                shots += 1
+                                in_correct_pose = False
 
-                    if arm_to_scan == "left":
-                        left_arm_connections = [(shoulder, elbow), (elbow, wrist)]
-                        left_leg_connections = [(hip, knee), (knee, ankle)]
-                        for connection in left_arm_connections + left_leg_connections:
-                            cv2.line(image, 
-                                     tuple(np.multiply(connection[0], [640, 480]).astype(int)),
-                                     tuple(np.multiply(connection[1], [640, 480]).astype(int)),
-                                     (0, 255, 0), 2)
-                    elif arm_to_scan == "right":
-                        right_arm_connections = [(shoulder, elbow), (elbow, wrist)]
-                        right_leg_connections = [(hip, knee), (knee, ankle)]
-                        for connection in right_arm_connections + right_leg_connections:
-                            cv2.line(image, 
-                                     tuple(np.multiply(connection[0], [640, 480]).astype(int)),
-                                     tuple(np.multiply(connection[1], [640, 480]).astype(int)),
-                                     (0, 255, 0), 2)
+                        draw_text_with_background(image, angle_status,
+                                                  (50, 50),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if angle_status == "Pose: Correct" else (0, 0, 255), 2, (0, 0, 0))
+
+                        draw_text_with_background(image, f"Correct Shots: {shots}",
+                                                  (50, 100),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
+
+                        if arm_to_scan == "left":
+                            left_arm_connections = [(shoulder, elbow), (elbow, wrist)]
+                            left_leg_connections = [(hip, knee), (knee, ankle)]
+                            for connection in left_arm_connections + left_leg_connections:
+                                cv2.line(image,
+                                         tuple(np.multiply(connection[0], [640, 480]).astype(int)),
+                                         tuple(np.multiply(connection[1], [640, 480]).astype(int)),
+                                         (0, 255, 0), 2)
+                        elif arm_to_scan == "right":
+                            right_arm_connections = [(shoulder, elbow), (elbow, wrist)]
+                            right_leg_connections = [(hip, knee), (knee, ankle)]
+                            for connection in right_arm_connections + right_leg_connections:
+                                cv2.line(image,
+                                         tuple(np.multiply(connection[0], [640, 480]).astype(int)),
+                                         tuple(np.multiply(connection[1], [640, 480]).astype(int)),
+                                         (0, 255, 0), 2)
                 else:
                     # Default: Draw all landmarks and connections
                     mp_drawing.draw_landmarks(image, results.pose_landmarks, mp_pose.POSE_CONNECTIONS)
@@ -162,21 +187,21 @@ def main():
                     right_hip, right_knee, right_ankle, right_leg_angle = calculate_angle(landmarks, "right_leg")
 
                     if left_elbow:
-                        cv2.putText(image, str(left_angle),
-                                    tuple(np.multiply(left_elbow, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        draw_text_with_background(image, str(left_angle),
+                                                  tuple(np.multiply(left_elbow, [640, 480]).astype(int)),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
                     if right_elbow:
-                        cv2.putText(image, str(right_angle),
-                                    tuple(np.multiply(right_elbow, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        draw_text_with_background(image, str(right_angle),
+                                                  tuple(np.multiply(right_elbow, [640, 480]).astype(int)),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
                     if left_knee:
-                        cv2.putText(image, str(left_leg_angle),
-                                    tuple(np.multiply(left_knee, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        draw_text_with_background(image, str(left_leg_angle),
+                                                  tuple(np.multiply(left_knee, [640, 480]).astype(int)),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
                     if right_knee:
-                        cv2.putText(image, str(right_leg_angle),
-                                    tuple(np.multiply(right_knee, [640, 480]).astype(int)),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, cv2.LINE_AA)
+                        draw_text_with_background(image, str(right_leg_angle),
+                                                  tuple(np.multiply(right_knee, [640, 480]).astype(int)),
+                                                  cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2, (0, 0, 0))
 
             cv2.imshow('Webcam Feed', image)
 
