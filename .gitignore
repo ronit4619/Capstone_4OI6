@@ -8,3 +8,4 @@
 /output_videos
 output_videos/output_video.avi
 stubs/track_stubs.pkl
+/Front_End/js/node_modules

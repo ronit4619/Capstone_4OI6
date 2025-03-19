@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const cors = require("cors");
 const bodyParser = require("body-parser");
+const axios = require("axios");
 
 const app = express();
 app.use(cors());
@@ -227,6 +228,17 @@ app.delete("/delete-account", authenticateToken, async (req, res) => {
     }
 });
 
+app.post("/analyze-video", async (req, res) => {
+  try {
+    const { videoUrl } = req.body;
+
+    const fastApiResponse = await axios.post(`${process.env.FASTAPI_URL}/analyze`, { videoUrl });
+
+    res.json({ message: "Video processed successfully", analysis: fastApiResponse.data });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to analyze video", error: error.message });
+  }
+});
 
 //🚀 Start Server
 const PORT = process.env.PORT || 5000;

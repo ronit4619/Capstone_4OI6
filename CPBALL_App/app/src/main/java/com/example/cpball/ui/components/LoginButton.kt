@@ -9,12 +9,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.cpball.ui.theme.PrimaryOrange
 
 @Composable
 fun LoginButton(onClick: () -> Unit) {
     Button(
         onClick = onClick,
-        colors = ButtonDefaults.buttonColors(backgroundColor = Color(0xFFFF4500)),
+        colors = ButtonDefaults.buttonColors(backgroundColor = PrimaryOrange),
         shape = RoundedCornerShape(8.dp),
         modifier = Modifier
             .fillMaxWidth()
