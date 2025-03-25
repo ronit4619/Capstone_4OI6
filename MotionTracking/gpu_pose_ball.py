@@ -7,6 +7,10 @@ from ultralytics import YOLO
 import time
 import torch
 
+import json
+from datetime import datetime
+
+
 torch_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 
@@ -25,6 +29,58 @@ recheck_interval = 0.1  # seconds #steph curry release is 0.4
 
 import numpy as np
 
+
+# def store_release_angle_if_valid(frame, smoothed_angle, ball_center, wrist_point, stored_release_angle, threshold=90):
+#     """
+#     Stores the release angle if the ball is far enough from the wrist and pose is valid.
+
+#     Args:
+#         frame (ndarray): Current video frame for annotation.
+#         smoothed_angle (float): Smoothed shoulder-elbow angle.
+#         ball_center (tuple): (x, y) position of the basketball.
+#         wrist_point (tuple): (x, y) position of the wrist.
+#         stored_release_angle (float or None): Currently stored release angle.
+#         threshold (int): Minimum pixel distance between ball and wrist to count as release.
+
+#     Returns:
+#         float: Updated stored release angle.
+#     """
+#     if ball_center is None or wrist_point is None:
+#         return stored_release_angle
+
+#     distance = calculate_distance(ball_center, wrist_point)
+
+#     if distance >= threshold:
+#         stored_release_angle = smoothed_angle
+#         cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°", 
+#                     (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
+
+#     # Draw line and distance regardless
+#     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px", 
+#                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 255), 2)
+
+#     return stored_release_angle
+def log_release_angle_to_json(release_angle, filename="release_angles.json"):
+    data = []
+
+    # Try loading existing data
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # File doesn't exist yet or is empty
+
+    # Add new release
+    data.append({
+        "timestamp": datetime.now().isoformat(),
+        "release_angle": round(release_angle, 2)
+    })
+
+    # Write updated list back to file
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+
 def calculate_distance(point1, point2):
     """
     Calculates the Euclidean distance between two (x, y) points.
@@ -37,6 +93,188 @@ def calculate_distance(point1, point2):
         Float distance between the two points
     """
     return np.linalg.norm(np.array(point1) - np.array(point2))
+
+# def is_basketball_supported_by_wrist_directional(shoulder, elbow, wrist, ball_center, distance_threshold=90, angle_threshold=90):
+#     """
+#     Determines if the basketball is near the wrist and in the direction of the forearm (elbow to wrist).
+
+#     Args:
+#         shoulder, elbow, wrist (tuple): Coordinates of the joint landmarks.
+#         ball_center (tuple): Coordinates of the basketball center.
+#         distance_threshold (float): Max distance between wrist and ball.
+#         angle_threshold (float): Max angle difference between arm direction and ball vector.
+
+#     Returns:
+#         bool: True if ball is near wrist and in shooting direction.
+#     """
+#     if wrist is None or ball_center is None or elbow is None:
+#         return False
+
+#     wrist = np.array(wrist)
+#     elbow = np.array(elbow)
+#     ball_center = np.array(ball_center)
+
+#     arm_direction = wrist - elbow
+#     ball_vector = ball_center - wrist
+
+#     distance = np.linalg.norm(ball_vector)
+#     if distance > distance_threshold:
+#         return False
+
+#     # Normalize vectors to get angle
+#     arm_dir_norm = arm_direction / np.linalg.norm(arm_direction)
+#     ball_vec_norm = ball_vector / np.linalg.norm(ball_vector)
+
+#     dot_product = np.dot(arm_dir_norm, ball_vec_norm)
+#     angle = np.degrees(np.arccos(np.clip(dot_product, -1.0, 1.0)))
+
+#     return angle < angle_threshold
+
+def is_ball_near_wrist(wrist, ball_center, threshold=100):
+    """
+    Returns True if the ball is within a certain pixel distance of the wrist.
+
+    Args:
+        wrist (tuple): (x, y) coordinates of the wrist.
+        ball_center (tuple): (x, y) coordinates of the basketball.
+        threshold (int): Distance threshold in pixels.
+
+    Returns:
+        bool: True if ball is within threshold distance from the wrist.
+    """
+    if wrist is None or ball_center is None:
+        return False
+
+    distance = calculate_distance(wrist, ball_center)
+    return distance < threshold
+
+
+# def store_release_angle_if_valid(frame, smoothed_angle, shoulder, elbow, wrist, ball_center, stored_release_angle, distance_threshold=150):
+#     """
+#     Stores the release angle if the ball was first supported by the wrist and then moved away.
+
+#     Args:
+#         frame (ndarray): Current video frame for annotation.
+#         smoothed_angle (float): Smoothed shoulder-elbow angle.
+#         shoulder, elbow, wrist (tuple): Joint coordinates.
+#         ball_center (tuple): Basketball center.
+#         stored_release_angle (float or None): Currently stored release angle.
+#         distance_threshold (int): Distance to determine shot release.
+
+#     Returns:
+#         float: Updated stored release angle.
+#     """
+#     if None in [shoulder, elbow, wrist, ball_center]:
+#         return stored_release_angle
+
+#     # Check if the ball was previously supported
+#     if is_ball_near_wrist(wrist, ball_center, threshold=100):
+#         # Now check if it's far enough to be considered a shot
+#         distance = calculate_distance(ball_center, wrist)
+#         if distance >= distance_threshold:
+#             stored_release_angle = smoothed_angle
+#             if stored_release_angle is not None:
+#                            log_release_angle_to_json(stored_release_angle)
+#             cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°", 
+#                         (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+#     # Draw distance always for feedback
+#     distance = calculate_distance(ball_center, wrist)
+#     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px", 
+#                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+
+#     return stored_release_angle
+
+
+def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
+                                  stored_release_angle, distance_threshold=150,
+                                  ball_was_near_wrist=False):
+    """
+    Stores the release angle if the ball was previously near the wrist and has now moved away.
+
+    Args:
+        frame (ndarray): Current video frame for annotation.
+        smoothed_angle (float): Smoothed shoulder-elbow angle.
+        wrist (tuple): Wrist coordinates.
+        ball_center (tuple): Ball coordinates.
+        stored_release_angle (float or None): Previously stored release angle.
+        distance_threshold (int): Distance in px to count as 'released'.
+        ball_was_near_wrist (bool): Was the ball near the wrist previously?
+
+    Returns:
+        tuple: (updated_release_angle, updated_ball_was_near_wrist)
+    """
+    if None in [wrist, ball_center]:
+        return stored_release_angle, ball_was_near_wrist
+
+    distance = calculate_distance(ball_center, wrist)
+
+    # Step 1: Detect "ball near wrist"
+    if distance < 100:
+        ball_was_near_wrist = True
+
+    # Step 2: Detect "ball moved away" after being near
+    elif ball_was_near_wrist and distance >= distance_threshold:
+        stored_release_angle = smoothed_angle
+        ball_was_near_wrist = False  # reset state
+        if stored_release_angle is not None:
+            log_release_angle_to_json(stored_release_angle)
+        cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
+                    (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+    # Always show distance
+    cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",
+                (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+
+    return stored_release_angle, ball_was_near_wrist
+
+
+# def is_valid_shooting_pose_fsm(smoothed_angle, state):
+#     """
+#     Implements a finite state machine to detect a valid shooting pose transition.
+#     Expects angle to go: ~50° ➝ ~0° ➝ ~50°
+
+#     Args:
+#         smoothed_angle (float): Shoulder-elbow smoothed angle.
+#         state (str): Current FSM state.
+
+#     Returns:
+#         new_state (str): Updated FSM state.
+#         is_release_frame (bool): True only when a valid release motion is detected.
+#     """
+#     is_release_frame = False
+
+#     if state == 'ready' and smoothed_angle >= 50:
+#         state = 'releasing'
+#     elif state == 'releasing' and smoothed_angle >= 20:
+#         state = 'recovered'
+#         is_release_frame = True
+#     elif state == 'recovered':
+#         # Reset FSM to allow another detection
+#         state = 'ready'
+
+#     return state, is_release_frame
+
+
+
+def is_valid_shooting_pose(angle): # have to fix the angle
+    """
+    Determines whether the user's pose is correct and the basketball is in frame.
+
+    Args:
+        angle (float): Arm angle.
+        leg_angle (float): Leg angle.
+        image (ndarray): Current video frame.
+        wrist_point (tuple or list): (x, y) coordinates of the wrist.
+
+    Returns:
+        bool: True if pose is valid and ball is visible, False otherwise.
+    """
+    arm_ok = 0 <= angle <= 10
+    
+    #ball_ok = ballDetected
+
+    return arm_ok
 
 
 def get_box_center(x1, y1, x2, y2):
@@ -128,6 +366,9 @@ def process_video():
     angle_buffer = deque(maxlen=7)
 
     with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+        # start global variable
+        #shooting_state = 'ready'
+        ball_was_near_wrist = False
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
@@ -173,26 +414,29 @@ def process_video():
                 smoothed_angle = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1] \
                     if len(angle_buffer) == angle_buffer.maxlen else shoulder_elbow_angle
 
-                if elbow_angle >= 165 and (smoothed_angle <= 15 or smoothed_angle >= 165):
-                    if stored_release_angle is None:
-                        stored_release_angle = smoothed_angle
-                        print(f"🎯 Stored Smoothed Release Angle: {stored_release_angle:.2f}°")
-
+               
                 ball_detected, ball_center = detect_and_track_basketball(frame, force_redetect)
 
                 if ball_detected:
                     cv2.putText(frame, "🎯 Basketball Detected!", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
-                    if ball_center is not None:
-                        wrist_point = tuple(map(int, wrist))
-                        ### when its above 90 px its good to go for saving shot release 
-                        distance = calculate_distance(ball_center, wrist_point)
+                    wrist_point = tuple(map(int, wrist))
+                   
 
-                        # Draw line and distance
-                        cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px", 
-                (50, 250),  # You can change this position
-                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 255), 2)
-                    
+                    if is_valid_shooting_pose :
+                       # just call the function
+                       position = (50, 180)
+                       cv2.putText(frame, "valid pose", position, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                       stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
+    frame, smoothed_angle, wrist, ball_center,
+    stored_release_angle, distance_threshold=150,
+    ball_was_near_wrist=ball_was_near_wrist
+)
+
+
+
+                       
+                       
                 elif not tracking_ball:
                     cv2.putText(frame, "👋 Press 'R' to detect basketball", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
