@@ -60,6 +60,33 @@ import numpy as np
 #                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 255), 2)
 
 #     return stored_release_angle
+def determine_facing_direction(landmarks, image_width):
+    """
+    Determines if the person is facing left or right based on nose and shoulders.
+
+    Args:
+        landmarks (list): List of MediaPipe pose landmarks.
+        image_width (int): Width of the frame/image.
+
+    Returns:
+        str: 'left', 'right', or 'undetermined'
+    """
+    try:
+        nose_x = landmarks[mp_pose.PoseLandmark.NOSE.value].x * image_width
+        left_shoulder_x = landmarks[mp_pose.PoseLandmark.LEFT_SHOULDER.value].x * image_width
+        right_shoulder_x = landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * image_width
+
+        # Compare distance from nose to shoulders
+        if abs(nose_x - left_shoulder_x) < abs(nose_x - right_shoulder_x):
+            return 'left'  # facing left
+        else:
+            return 'right'  # facing right
+    except Exception as e:
+        print(f"Facing direction detection error: {e}")
+        return 'undetermined'
+
+
+
 def log_release_angle_to_json(release_angle, filename="release_angles.json"):
     data = []
 
@@ -384,6 +411,11 @@ def process_video():
             if results.pose_landmarks:
                 landmarks = results.pose_landmarks.landmark
 
+                ## added
+                direction = determine_facing_direction(landmarks, frame.shape[1]) 
+                cv2.putText(frame, f"Facing: {direction}", (50, 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
                 shoulder = [landmarks[SHOULDER].x * frame.shape[1], landmarks[SHOULDER].y * frame.shape[0]]
                 elbow = [landmarks[ELBOW].x * frame.shape[1], landmarks[ELBOW].y * frame.shape[0]]
                 wrist = [landmarks[WRIST].x * frame.shape[1], landmarks[WRIST].y * frame.shape[0]]
@@ -413,6 +445,10 @@ def process_video():
 
                 smoothed_angle = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1] \
                     if len(angle_buffer) == angle_buffer.maxlen else shoulder_elbow_angle
+                
+
+                if direction == 'right':
+                    smoothed_angle = 180 - smoothed_angle
 
                
                 ball_detected, ball_center = detect_and_track_basketball(frame, force_redetect)
@@ -472,5 +508,3 @@ else:
     print("⚠️ GPU not available. Running on CPU.")
 
 process_video()
-
-
