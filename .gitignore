@@ -15,3 +15,5 @@ Front_End/js/node_modules/.bin/bcrypt
 /Front_End/js/node_modules
 /Front_End/js/package-lock.json
 /Front_End/js/package.json
+*.avi
+stubs/track_stubs.pkl
