@@ -184,7 +184,7 @@ class shotCounter:
         self.class_names = ['Basketball', 'Basketball Hoop']
         self.device = get_device()
         #Uncomment to use webcam
-        self.cap = cv2.VideoCapture("video_test_5.mp4")
+        self.cap = cv2.VideoCapture(0)
 
         #Use video
         #self.cap = cv2.VideoCapture("video_test_5.mp4")
