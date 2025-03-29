@@ -24,7 +24,7 @@ tracking_ball = False
 lost_tracker_frames = 0
 tracker_lost_threshold = 10
 last_yolo_check_time = 0
-recheck_interval = 0.1  # seconds #steph curry release is 0.4
+recheck_interval = 0.01  # seconds #steph curry release is 0.4
 
 
 import numpy as np
@@ -382,7 +382,14 @@ def process_video():
     ELBOW = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_ELBOW").value
     WRIST = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_WRIST").value
 
-    cap = cv2.VideoCapture(0)
+    non_dominant = 'right' if arm_choice == 'left' else 'left'
+    NON_DOM_SHOULDER = getattr(mp_pose.PoseLandmark, f"{non_dominant.upper()}_SHOULDER").value
+    
+    #cap = cv2.VideoCapture("")
+    #"C:/Users/antho/Downloads/20250325_102838.mp4"
+    #"C:/Users/antho/Downloads/IMG_0519.MOV"
+
+    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0523.MOV")
     if not cap.isOpened():
         print("❌ Error: Could not access webcam.")
         return
@@ -419,6 +426,10 @@ def process_video():
                 shoulder = [landmarks[SHOULDER].x * frame.shape[1], landmarks[SHOULDER].y * frame.shape[0]]
                 elbow = [landmarks[ELBOW].x * frame.shape[1], landmarks[ELBOW].y * frame.shape[0]]
                 wrist = [landmarks[WRIST].x * frame.shape[1], landmarks[WRIST].y * frame.shape[0]]
+                dominant_shoulder_z = landmarks[SHOULDER].z
+                non_dominant_shoulder_z = landmarks[NON_DOM_SHOULDER].z
+                
+
 
                 x_axis_start = (int(shoulder[0] - 100), int(shoulder[1]))
                 x_axis_end = (int(shoulder[0] + 150), int(shoulder[1]))
@@ -447,8 +458,15 @@ def process_video():
                     if len(angle_buffer) == angle_buffer.maxlen else shoulder_elbow_angle
                 
 
-                if direction == 'right':
-                    smoothed_angle = 180 - smoothed_angle
+                
+                
+                # Compare z-coordinates
+                if dominant_shoulder_z > non_dominant_shoulder_z:
+                    smoothed_angle=180-smoothed_angle
+                
+                
+                #if direction == 'right':
+                #    smoothed_angle = 180 - smoothed_angle
 
                
                 ball_detected, ball_center = detect_and_track_basketball(frame, force_redetect)
