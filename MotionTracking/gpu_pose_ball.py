@@ -24,7 +24,7 @@ tracking_ball = False
 lost_tracker_frames = 0
 tracker_lost_threshold = 10
 last_yolo_check_time = 0
-recheck_interval = 0.01  # seconds #steph curry release is 0.4
+recheck_interval = 0.1  # seconds #steph curry release is 0.4
 
 
 import numpy as np
@@ -157,6 +157,38 @@ def calculate_distance(point1, point2):
 
 #     return angle < angle_threshold
 
+
+def draw_projectile_path(frame, release_angle_deg, v=8.0, g=9.81, scale=135, start_pos=(100, 400), color=(0, 0, 255)):
+    """
+    Draws a projectile trajectory on the frame given a release angle.
+
+    Args:
+        frame: The video frame to draw on.
+        release_angle_deg: Release angle in degrees.
+        v: Initial speed (m/s).
+        g: Acceleration due to gravity (m/s^2).
+        scale: Pixel scaling factor (larger = further reach).
+        start_pos: Starting pixel position (x0, y0).
+        color: RGB color of the path.
+    """
+    angle_rad = np.radians(release_angle_deg)
+    t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)  # simulate until ball hits ground
+
+    for t in t_vals:
+        x = v * np.cos(angle_rad) * t
+        y = v * np.sin(angle_rad) * t - 0.5 * g * t**2
+        x_px = int(start_pos[0] + x * scale)
+        y_px = int(start_pos[1] - y * scale)  # invert y for image coordinates
+        if 0 <= x_px < frame.shape[1] and 0 <= y_px < frame.shape[0]:
+            cv2.circle(frame, (x_px, y_px), 2, color, -1)
+
+
+
+
+
+
+
+
 def is_ball_near_wrist(wrist, ball_center, threshold=100):
     """
     Returns True if the ball is within a certain pixel distance of the wrist.
@@ -246,8 +278,14 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
         ball_was_near_wrist = False  # reset state
         if stored_release_angle is not None:
             log_release_angle_to_json(stored_release_angle)
-        cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
+            cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
                     (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            if wrist is not None:
+                start_pos = tuple(map(int,wrist))
+                draw_projectile_path(frame, stored_release_angle, start_pos=start_pos)
+
+        
+        
 
     # Always show distance
     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",

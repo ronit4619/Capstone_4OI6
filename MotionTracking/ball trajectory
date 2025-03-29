@@ -1,3 +1,325 @@
+# import cv2
+# import numpy as np
+# from ultralytics import YOLO
+# from collections import deque
+# import torch
+# import mediapipe as mp
+# from scipy.signal import savgol_filter
+
+# # Load YOLO model
+# model = YOLO('best.pt')
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# model.to(device)
+
+# # Set up Kalman Filter
+# kalman = cv2.KalmanFilter(4, 2)
+# kalman.measurementMatrix = np.array([[1, 0, 0, 0],
+#                                      [0, 1, 0, 0]], np.float32)
+# kalman.transitionMatrix = np.array([[1, 0, 1, 0],
+#                                     [0, 1, 0, 1],
+#                                     [0, 0, 1, 0],
+#                                     [0, 0, 0, 1]], np.float32)
+# kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
+
+# # Trajectory history and pose angle buffer
+# trajectory = deque(maxlen=50)
+# angle_buffer = deque(maxlen=7)
+
+# # MediaPipe setup
+# mp_pose = mp.solutions.pose
+# pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+# def calculate_shoulder_elbow_angle(shoulder, elbow):
+#     vec = np.array(elbow) - np.array(shoulder)
+#     x_axis = np.array([1, 0])
+#     cosine_angle = np.dot(vec, x_axis) / np.linalg.norm(vec)
+#     return np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
+
+# def is_valid_shooting_pose(shoulder, elbow):
+#     angle = calculate_shoulder_elbow_angle(shoulder, elbow)
+#     angle_buffer.append(angle)
+#     if len(angle_buffer) == angle_buffer.maxlen:
+#         smoothed = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1]
+#     else:
+#         smoothed = angle
+#     return 0 <= smoothed <= 10, smoothed
+
+# def fit_parabola(points):
+#     if len(points) >= 5:
+#         x = np.array([p[0] for p in points])
+#         y = np.array([p[1] for p in points])
+#         coeffs = np.polyfit(x, y, 2)
+#         return coeffs
+#     return None
+
+# def draw_trajectory(frame, coeffs):
+#     if coeffs is not None:
+#         for x in range(0, frame.shape[1], 10):
+#             y = int(coeffs[0] * x**2 + coeffs[1] * x + coeffs[2])
+#             if 0 <= y < frame.shape[0]:
+#                 cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+
+# def extract_pose(frame):
+#     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#     results = pose.process(rgb)
+#     if results.pose_landmarks:
+#         landmarks = results.pose_landmarks.landmark
+#         shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * frame.shape[1],
+#                     landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * frame.shape[0]]
+#         elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * frame.shape[1],
+#                  landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * frame.shape[0]]
+#         return shoulder, elbow
+#     return None, None
+
+# def predict_smooth_trajectory(video_path):
+#     cap = cv2.VideoCapture(video_path)
+#     tracking_enabled = False
+
+#     # Bounce detection variables
+#     last_pred_y = None    # Store the last predicted y
+#     going_down = False    # True if the ball was going down in the last frame
+
+#     while cap.isOpened():
+#         ret, frame = cap.read()
+#         if not ret:
+#             break
+
+#         shoulder, elbow = extract_pose(frame)
+#         if shoulder and elbow:
+#             valid, smoothed_angle = is_valid_shooting_pose(shoulder, elbow)
+#             cv2.putText(frame, f"Smoothed Angle: {int(smoothed_angle)}", (50, 50),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+#             if valid:
+#                 tracking_enabled = True
+#                 cv2.putText(frame, "✅ Valid Pose", (50, 100),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+#         if tracking_enabled:
+#             results = model(frame)
+#             detected = False
+
+#             for r in results:
+#                 for box in r.boxes:
+#                     if int(box.cls[0]) == 0 and float(box.conf[0]) > 0.7:
+#                         x1, y1, x2, y2 = map(int, box.xyxy[0])
+#                         cx = x1 + (x2 - x1) // 2
+#                         cy = y1 + (y2 - y1) // 2
+#                         measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+#                         kalman.correct(measurement)
+#                         detected = True
+#                         break
+
+#             prediction = kalman.predict()
+#             px, py = int(prediction[0]), int(prediction[1])
+
+#             if detected:
+#                 # Bounce detection logic
+#                 if last_pred_y is not None:
+#                     # Positive dy => ball going down, Negative dy => ball going up
+#                     dy = py - last_pred_y
+#                     if dy > 0:  # Going down
+#                         if not going_down:
+#                             # We just switched from up to down, so this might be after a bounce
+#                             pass
+#                         going_down = True
+#                     else:        # Going up
+#                         if going_down:
+#                             # The ball just switched from going down to going up -> bounce!
+#                             trajectory.clear()
+#                         going_down = False
+                
+#                 last_pred_y = py
+
+#                 # Append the latest position
+#                 trajectory.append((px, py))
+#                 cv2.circle(frame, (px, py), 6, (0, 255, 0), -1)
+
+#             coeffs = fit_parabola(trajectory)
+#             draw_trajectory(frame, coeffs)
+
+#         cv2.imshow("Shooting Pose & Ball Trajectory", frame)
+#         if cv2.waitKey(1) & 0xFF == ord('q'):
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+
+# # 🚀 Run it
+# predict_smooth_trajectory("C:/Users/antho/Downloads/IMG_0524.MOV")
+
+
+# import cv2
+# import numpy as np
+# from ultralytics import YOLO
+# from collections import deque
+# import torch
+# import mediapipe as mp
+# from scipy.signal import savgol_filter
+
+# # Load YOLO model
+# model = YOLO('best.pt')
+# device = 'cuda' if torch.cuda.is_available() else 'cpu'
+# model.to(device)
+
+# # Set up Kalman Filter
+# kalman = cv2.KalmanFilter(4, 2)
+# kalman.measurementMatrix = np.array([[1, 0, 0, 0],
+#                                      [0, 1, 0, 0]], np.float32)
+# kalman.transitionMatrix = np.array([[1, 0, 1, 0],
+#                                     [0, 1, 0, 1],
+#                                     [0, 0, 1, 0],
+#                                     [0, 0, 0, 1]], np.float32)
+# kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03
+
+# # Trajectory history and pose angle buffer
+# trajectory = deque(maxlen=50)
+# angle_buffer = deque(maxlen=7)
+
+# # MediaPipe setup
+# mp_pose = mp.solutions.pose
+# pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+
+# def calculate_shoulder_elbow_angle(shoulder, elbow):
+#     vec = np.array(elbow) - np.array(shoulder)
+#     x_axis = np.array([1, 0])  # reference horizontal vector
+#     cosine_angle = np.dot(vec, x_axis) / np.linalg.norm(vec)
+#     return np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
+
+# def is_valid_shooting_pose(shoulder, elbow):
+#     """Return (valid_boolean, smoothed_angle)."""
+#     angle = calculate_shoulder_elbow_angle(shoulder, elbow)
+#     angle_buffer.append(angle)
+#     if len(angle_buffer) == angle_buffer.maxlen:
+#         smoothed = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1]
+#     else:
+#         smoothed = angle
+#     # Simple rule: smoothed angle between 0 and 10 => valid
+#     return (0 <= smoothed <= 10), smoothed
+
+# def fit_parabola(points):
+#     """Fit a quadratic (parabola) to the points and return coefficients."""
+#     if len(points) >= 5:
+#         x = np.array([p[0] for p in points])
+#         y = np.array([p[1] for p in points])
+#         coeffs = np.polyfit(x, y, 2)
+#         return coeffs  # [a, b, c]
+#     return None
+
+# def draw_trajectory(frame, coeffs):
+#     """Draw the fitted parabola on the frame."""
+#     if coeffs is not None:
+#         a, b, c = coeffs
+#         h, w = frame.shape[:2]
+#         for x in range(0, w, 10):
+#             y = int(a * x**2 + b * x + c)
+#             if 0 <= y < h:
+#                 cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
+
+# def extract_pose(frame):
+#     """Use MediaPipe to get RIGHT_SHOULDER and RIGHT_ELBOW coordinates."""
+#     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+#     results = pose.process(rgb)
+#     if results.pose_landmarks:
+#         landmarks = results.pose_landmarks.landmark
+#         shoulder = [
+#             landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * frame.shape[1],
+#             landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * frame.shape[0]
+#         ]
+#         elbow = [
+#             landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * frame.shape[1],
+#             landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * frame.shape[0]
+#         ]
+#         return shoulder, elbow
+#     return None, None
+
+# def predict_smooth_trajectory(video_path):
+#     cap = cv2.VideoCapture(video_path)
+#     tracking_enabled = True  # Always track the ball
+
+#     # Bounce detection variables
+#     last_pred_y = None
+#     going_down = False
+
+#     while cap.isOpened():
+#         ret, frame = cap.read()
+#         if not ret:
+#             break
+
+#         # Extract Pose (so we can check if it's valid)
+#         shoulder, elbow = extract_pose(frame)
+#         valid_pose = False
+#         smoothed_angle = 0
+
+#         if shoulder and elbow:
+#             valid_pose, smoothed_angle = is_valid_shooting_pose(shoulder, elbow)
+#             cv2.putText(frame, f"Smoothed Angle: {int(smoothed_angle)}", (50, 50),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
+
+#         if valid_pose:
+#             cv2.putText(frame, "✅ Valid Pose", (50, 100),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+#         # ------------------------
+#         # Always Track the Ball
+#         # ------------------------
+#         if tracking_enabled:
+#             results = model(frame)
+#             detected = False
+
+#             for r in results:
+#                 for box in r.boxes:
+#                     # Suppose class 0 = basketball
+#                     if int(box.cls[0]) == 0 and float(box.conf[0]) > 0.7:
+#                         x1, y1, x2, y2 = map(int, box.xyxy[0])
+#                         cx = x1 + (x2 - x1) // 2
+#                         cy = y1 + (y2 - y1) // 2
+#                         measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
+#                         kalman.correct(measurement)
+#                         detected = True
+#                         break  # Only take the first basketball detection
+
+#             # Kalman predict
+#             prediction = kalman.predict()
+#             px, py = int(prediction[0]), int(prediction[1])
+
+#             if detected:
+#                 # Bounce detection logic
+#                 if last_pred_y is not None:
+#                     dy = py - last_pred_y
+#                     if dy > 0:  # ball going down
+#                         going_down = True
+#                     else:       # ball going up
+#                         # If we were going down previously and now going up => bounce
+#                         if going_down:
+#                             trajectory.clear()
+#                         going_down = False
+
+#                 last_pred_y = py
+
+#                 # Update trajectory (positions) no matter what
+#                 trajectory.append((px, py))
+
+#                 # Draw the Kalman predicted position as a circle
+#                 cv2.circle(frame, (px, py), 6, (0, 255, 0), -1)
+
+#         # ------------------------
+#         # Only Fit/Draw Parabola if the Pose is Valid
+#         # ------------------------
+#         if valid_pose and len(trajectory) > 2:
+#             coeffs = fit_parabola(trajectory)
+#             draw_trajectory(frame, coeffs)
+
+#         cv2.imshow("Shooting Pose & Ball Trajectory", frame)
+#         if cv2.waitKey(1) & 0xFF == ord('q'):
+#             break
+
+#     cap.release()
+#     cv2.destroyAllWindows()
+
+# # 🚀 Run it
+# predict_smooth_trajectory("C:/Users/antho/Downloads/IMG_0524.MOV")
+
+
 import cv2
 import numpy as np
 from ultralytics import YOLO
@@ -5,6 +327,7 @@ from collections import deque
 import torch
 import mediapipe as mp
 from scipy.signal import savgol_filter
+import math
 
 # Load YOLO model
 model = YOLO('best.pt')
@@ -31,89 +354,163 @@ pose = mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
 
 def calculate_shoulder_elbow_angle(shoulder, elbow):
     vec = np.array(elbow) - np.array(shoulder)
-    x_axis = np.array([1, 0])
+    x_axis = np.array([1, 0])  # reference horizontal vector
+    # Dot product => cos(theta)
     cosine_angle = np.dot(vec, x_axis) / np.linalg.norm(vec)
     return np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
 
 def is_valid_shooting_pose(shoulder, elbow):
+    """Return (valid_boolean, smoothed_angle)."""
     angle = calculate_shoulder_elbow_angle(shoulder, elbow)
     angle_buffer.append(angle)
     if len(angle_buffer) == angle_buffer.maxlen:
         smoothed = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1]
     else:
         smoothed = angle
-    return 0 <= smoothed <= 10, smoothed
+    # Simple rule: smoothed angle between 0 and 10 => valid
+    return (0 <= smoothed <= 10), smoothed
 
 def fit_parabola(points):
+    """Fit a quadratic (parabola) to the points and return coefficients."""
     if len(points) >= 5:
         x = np.array([p[0] for p in points])
         y = np.array([p[1] for p in points])
         coeffs = np.polyfit(x, y, 2)
-        return coeffs
+        return coeffs  # [a, b, c]
     return None
 
 def draw_trajectory(frame, coeffs):
+    """Draw the fitted parabola on the frame."""
     if coeffs is not None:
-        for x in range(0, frame.shape[1], 10):
-            y = int(coeffs[0] * x**2 + coeffs[1] * x + coeffs[2])
-            if 0 <= y < frame.shape[0]:
+        a, b, c = coeffs
+        h, w = frame.shape[:2]
+        for x in range(0, w, 10):
+            y = int(a * x**2 + b * x + c)
+            if 0 <= y < h:
                 cv2.circle(frame, (x, y), 2, (255, 0, 0), -1)
 
 def extract_pose(frame):
+    """
+    Use MediaPipe to get:
+      - RIGHT_SHOULDER
+      - RIGHT_ELBOW
+      - RIGHT_WRIST
+    Returns (shoulder, elbow, wrist) in pixel coords or (None, None, None).
+    """
     rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = pose.process(rgb)
     if results.pose_landmarks:
+        h, w = frame.shape[:2]
         landmarks = results.pose_landmarks.landmark
-        shoulder = [landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * frame.shape[1],
-                    landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * frame.shape[0]]
-        elbow = [landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * frame.shape[1],
-                 landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * frame.shape[0]]
-        return shoulder, elbow
-    return None, None
+
+        shoulder = [
+            landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].x * w,
+            landmarks[mp_pose.PoseLandmark.RIGHT_SHOULDER.value].y * h
+        ]
+        elbow = [
+            landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].x * w,
+            landmarks[mp_pose.PoseLandmark.RIGHT_ELBOW.value].y * h
+        ]
+        wrist = [
+            landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].x * w,
+            landmarks[mp_pose.PoseLandmark.RIGHT_WRIST.value].y * h
+        ]
+        return shoulder, elbow, wrist
+    return None, None, None
 
 def predict_smooth_trajectory(video_path):
     cap = cv2.VideoCapture(video_path)
-    tracking_enabled = False
+
+    # Always track the ball
+    tracking_enabled = True
+
+    # Bounce detection variables
+    last_pred_y = None
+    going_down = False
+
+    # For measuring distance between ball and wrist
+    ball_center = None  # (cx, cy)
 
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
             break
 
-        shoulder, elbow = extract_pose(frame)
+        # Extract Pose (shoulder, elbow, wrist)
+        shoulder, elbow, wrist = extract_pose(frame)
+        valid_pose = False
+        smoothed_angle = 0
+
         if shoulder and elbow:
-            valid, smoothed_angle = is_valid_shooting_pose(shoulder, elbow)
+            valid_pose, smoothed_angle = is_valid_shooting_pose(shoulder, elbow)
             cv2.putText(frame, f"Smoothed Angle: {int(smoothed_angle)}", (50, 50),
                         cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 255), 2)
-            if valid:
-                tracking_enabled = True
-                cv2.putText(frame, "✅ Valid Pose", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
+        if valid_pose:
+            cv2.putText(frame, "✅ Valid Pose", (50, 100),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+        # ------------------------
+        # Always Track the Ball
+        # ------------------------
         if tracking_enabled:
             results = model(frame)
             detected = False
 
             for r in results:
                 for box in r.boxes:
-                    if int(box.cls[0]) == 0 and float(box.conf[0]) > 0.6:
+                    # Suppose class 0 = basketball
+                    if int(box.cls[0]) == 0 and float(box.conf[0]) > 0.7:
                         x1, y1, x2, y2 = map(int, box.xyxy[0])
                         cx = x1 + (x2 - x1) // 2
                         cy = y1 + (y2 - y1) // 2
                         measurement = np.array([[np.float32(cx)], [np.float32(cy)]])
                         kalman.correct(measurement)
                         detected = True
-                        break
+                        ball_center = (cx, cy)
+                        break  # Only take the first basketball detection
 
+            # Kalman predict
             prediction = kalman.predict()
             px, py = int(prediction[0]), int(prediction[1])
 
             if detected:
+                # ------------------------
+                # Bounce Detection
+                # ------------------------
+                if last_pred_y is not None:
+                    dy = py - last_pred_y
+                    if dy > 0:  # ball going down
+                        going_down = True
+                    else:       # ball going up
+                        # If we were going down previously and now going up => bounce
+                        if going_down:
+                            trajectory.clear()
+                        going_down = False
+                last_pred_y = py
+
+                # Append position to trajectory
                 trajectory.append((px, py))
+                # Draw the Kalman predicted position
                 cv2.circle(frame, (px, py), 6, (0, 255, 0), -1)
 
-            coeffs = fit_parabola(trajectory)
-            draw_trajectory(frame, coeffs)
+        # ------------------------
+        # Only Fit/Draw Parabola if:
+        #   1) Pose is valid
+        #   2) distance from wrist > 100 (if ball detected)
+        # ------------------------
+        if valid_pose and ball_center and wrist:
+            # Measure distance from wrist to ball
+            cx, cy = ball_center
+            wx, wy = wrist
+            dist = math.hypot(cx - wx, cy - wy)
+            cv2.putText(frame, f"Dist to Wrist: {int(dist)}", (50, 150),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+
+            # If distance > 100, we do the trajectory
+            if dist > 200 and len(trajectory) >= 5:
+                coeffs = fit_parabola(trajectory)
+                draw_trajectory(frame, coeffs)
 
         cv2.imshow("Shooting Pose & Ball Trajectory", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
