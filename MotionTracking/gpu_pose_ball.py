@@ -26,6 +26,10 @@ tracker_lost_threshold = 10
 last_yolo_check_time = 0
 recheck_interval = 0.1  # seconds #steph curry release is 0.4
 
+## global
+last_ball_center = None
+last_ball_box = None  # will store (x1, x2)
+
 
 import numpy as np
 
@@ -158,29 +162,21 @@ def calculate_distance(point1, point2):
 #     return angle < angle_threshold
 
 
-def draw_projectile_path(frame, release_angle_deg, v=8.0, g=9.81, scale=135, start_pos=(100, 400), color=(0, 0, 255)):
-    """
-    Draws a projectile trajectory on the frame given a release angle.
-
-    Args:
-        frame: The video frame to draw on.
-        release_angle_deg: Release angle in degrees.
-        v: Initial speed (m/s).
-        g: Acceleration due to gravity (m/s^2).
-        scale: Pixel scaling factor (larger = further reach).
-        start_pos: Starting pixel position (x0, y0).
-        color: RGB color of the path.
-    """
+def generate_projectile_points(release_angle_deg, v=5.5, g=9.81, scale=135, start_pos=(100, 400)):
     angle_rad = np.radians(release_angle_deg)
-    t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)  # simulate until ball hits ground
+    t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
+    points = []
 
     for t in t_vals:
         x = v * np.cos(angle_rad) * t
         y = v * np.sin(angle_rad) * t - 0.5 * g * t**2
         x_px = int(start_pos[0] + x * scale)
-        y_px = int(start_pos[1] - y * scale)  # invert y for image coordinates
-        if 0 <= x_px < frame.shape[1] and 0 <= y_px < frame.shape[0]:
-            cv2.circle(frame, (x_px, y_px), 2, color, -1)
+        y_px = int(start_pos[1] - y * scale)
+
+        points.append((x_px, y_px))
+
+    return points
+
 
 
 
@@ -245,53 +241,84 @@ def is_ball_near_wrist(wrist, ball_center, threshold=100):
 #     return stored_release_angle
 
 
-def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
-                                  stored_release_angle, distance_threshold=150,
-                                  ball_was_near_wrist=False):
+def quick_detect_ball(image, max_attempts=10, delay=0.01, confidence_threshold=0.7):
     """
-    Stores the release angle if the ball was previously near the wrist and has now moved away.
+    Detects the basketball using YOLO and waits until it is found or max_attempts is reached.
 
     Args:
-        frame (ndarray): Current video frame for annotation.
-        smoothed_angle (float): Smoothed shoulder-elbow angle.
-        wrist (tuple): Wrist coordinates.
-        ball_center (tuple): Ball coordinates.
-        stored_release_angle (float or None): Previously stored release angle.
-        distance_threshold (int): Distance in px to count as 'released'.
-        ball_was_near_wrist (bool): Was the ball near the wrist previously?
+        image (ndarray): The current video frame.
+        max_attempts (int): Max retries before giving up.
+        delay (float): Delay in seconds between attempts.
+        confidence_threshold (float): Minimum confidence to accept detection.
 
     Returns:
-        tuple: (updated_release_angle, updated_ball_was_near_wrist)
+        tuple or None: (x, y) center of basketball if found, else None.
+    """
+    for _ in range(max_attempts):
+        results = model(image)
+
+        for result in results:
+            for box in result.boxes:
+                class_id = int(box.cls[0])
+                confidence = float(box.conf[0])
+
+                if class_id == 0 and confidence > confidence_threshold:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    cx = x1 + (x2 - x1) // 2
+                    cy = y1 + (y2 - y1) // 2
+                    return (cx, cy)
+
+        time.sleep(delay)
+
+    return None  # Ball wasn't detected within allowed attempts
+
+def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
+                                  stored_release_angle, distance_threshold=150,
+                                  ball_was_near_wrist=False, Newscale=100):
+    """
+    Detects release and returns updated release angle, state, and projectile points (if any).
     """
     if None in [wrist, ball_center]:
-        return stored_release_angle, ball_was_near_wrist
+        return stored_release_angle, ball_was_near_wrist, []
 
     distance = calculate_distance(ball_center, wrist)
+    new_projectile = []
 
-    # Step 1: Detect "ball near wrist"
     if distance < 100:
         ball_was_near_wrist = True
 
-    # Step 2: Detect "ball moved away" after being near
     elif ball_was_near_wrist and distance >= distance_threshold:
         stored_release_angle = smoothed_angle
-        ball_was_near_wrist = False  # reset state
+        ball_was_near_wrist = False
+
         if stored_release_angle is not None:
             log_release_angle_to_json(stored_release_angle)
             cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
-                    (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                        (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+
+
+
+            release_time = time.time()
+            release_position = ball_center
+
+
+            later_time = time.time()
+            later_position = ball_center  #current ball position
+
+            speed = calculate_release_speed(release_position, release_time, later_position, later_time, Newscale)
+
+            # ✅ Generate and return the arc points to store
             if wrist is not None:
-                start_pos = tuple(map(int,wrist))
-                draw_projectile_path(frame, stored_release_angle, start_pos=start_pos)
+                start_pos = tuple(map(int, wrist))
+                new_projectile = generate_projectile_points(stored_release_angle, start_pos=start_pos, scale=Newscale)
 
-        
-        
-
-    # Always show distance
+    # Show distance always
     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",
                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
 
-    return stored_release_angle, ball_was_near_wrist
+    return stored_release_angle, ball_was_near_wrist, new_projectile
+
+
 
 
 # def is_valid_shooting_pose_fsm(smoothed_angle, state):
@@ -351,6 +378,67 @@ def get_box_center(x1, y1, x2, y2):
     return (cx, cy)
 
 
+# def detect_and_track_basketball(image, force_redetect=False):
+#     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
+
+#     current_time = time.time()
+#     if force_redetect:
+#         tracking_ball = False
+#         tracker = None
+#         print("🔄 Manual reset: Forcing re-detection.")
+
+#     # Periodic YOLO re-check every recheck_interval seconds
+#     if tracking_ball and (current_time - last_yolo_check_time > recheck_interval):
+#         print("🔁 Performing periodic YOLO confirmation.")
+#         tracking_ball = False
+#         tracker = None
+
+#     # If currently tracking, try updating with tracker
+#     if tracking_ball and tracker is not None:
+#         success, box = tracker.update(image)
+#         if success:
+#             lost_tracker_frames = 0
+#             x, y, w, h = map(int, box)
+#             cx, cy = get_box_center(x, y, x + w, y + h)
+#             cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+#             cv2.putText(image, "Tracking", (x, y - 10),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+#             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
+#             return True, (cx, cy)
+#         else:
+#             lost_tracker_frames += 1
+#             if lost_tracker_frames >= tracker_lost_threshold:
+#                 print("🛑 Tracker lost the ball. Switching to re-detection.")
+#                 tracking_ball = False
+#                 tracker = None
+#             return False, None
+
+#     # If not tracking or re-detecting
+#     results = model(image)
+#     last_yolo_check_time = current_time  # reset timer on detection
+#     for result in results:
+#         for box in result.boxes:
+#             class_id = int(box.cls[0])
+#             confidence = float(box.conf[0])
+#             if class_id == 0 and confidence > 0.70:
+#                 x1, y1, x2, y2 = map(int, box.xyxy[0])
+#                 w, h = x2 - x1, y2 - y1
+#                 tracker = cv2.TrackerCSRT_create()
+#                 tracker.init(image, (x1, y1, w, h))
+#                 tracking_ball = True
+#                 lost_tracker_frames = 0
+#                 cx, cy = get_box_center(x1, y1, x2, y2)
+#                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#                 label = f"basketball: {confidence:.2f}"
+#                 cv2.putText(image, label, (x1, y1 - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
+#                 return True, (cx, cy)
+
+#     return False, None ## the return type is boolean for detection and the centre of ther ball
+
+
+
 def detect_and_track_basketball(image, force_redetect=False):
     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
 
@@ -377,18 +465,18 @@ def detect_and_track_basketball(image, force_redetect=False):
             cv2.putText(image, "Tracking", (x, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
-            return True, (cx, cy)
+            return True, (cx, cy), (x, x + w)  # 👈 include x1, x2
         else:
             lost_tracker_frames += 1
             if lost_tracker_frames >= tracker_lost_threshold:
                 print("🛑 Tracker lost the ball. Switching to re-detection.")
                 tracking_ball = False
                 tracker = None
-            return False, None
+            return False, None, None
 
     # If not tracking or re-detecting
     results = model(image)
-    last_yolo_check_time = current_time  # reset timer on detection
+    last_yolo_check_time = current_time
     for result in results:
         for box in result.boxes:
             class_id = int(box.cls[0])
@@ -406,11 +494,64 @@ def detect_and_track_basketball(image, force_redetect=False):
                 cv2.putText(image, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
-                return True, (cx, cy)
+                return True, (cx, cy), (x1, x2)  # 👈 this is key
 
-    return False, None ## the return type is boolean for detection and the centre of ther ball
+    return False, None, None  # when no detection
+
+
+def determine_dynamic_scale(x1, x2, real_diameter_m=0.24):
+    """
+    Calculates pixels-per-meter scale using basketball diameter.
+
+    Args:
+        x1 (int): Left x-coordinate of bounding box.
+        x2 (int): Right x-coordinate of bounding box.
+        real_diameter_m (float): Real-world diameter of basketball (default: 0.24m).
+
+    Returns:
+        float: Scale in pixels per meter.
+    """
+    pixel_diameter = abs(x2 - x1)
+    if pixel_diameter == 0:
+        return None  # Avoid division by zero
+    return pixel_diameter / real_diameter_m
+
+
+
+
+
+def calculate_release_speed(pos1, t1, pos2, t2, pixels_per_meter):
+    """
+    Calculates horizontal release speed (m/s) between two points.
+
+    Args:
+        pos1 (tuple): (x, y) of ball at release.
+        t1 (float): Timestamp of release (seconds).
+        pos2 (tuple): (x, y) of ball shortly after release.
+        t2 (float): Timestamp of second point (seconds).
+        pixels_per_meter (float): Pixel-to-meter scale based on ball diameter.
+
+    Returns:
+        float: Estimated horizontal speed in m/s.
+    """
+    if None in [pos1, pos2, t1, t2] or t2 <= t1:
+        return None
+
+    dx_px = pos2[0] - pos1[0]
+    dx_m = dx_px / pixels_per_meter
+    dt = t2 - t1
+
+    return dx_m / dt
+
+
+
+
 
 def process_video():
+
+    projectile_points = []
+
+
     arm_choice = input("👉 Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
     if arm_choice not in ['left', 'right']:
         print("❌ Invalid choice. Please enter 'left' or 'right'.")
@@ -507,23 +648,40 @@ def process_video():
                 #    smoothed_angle = 180 - smoothed_angle
 
                
-                ball_detected, ball_center = detect_and_track_basketball(frame, force_redetect)
+                ball_detected, ball_center,ball_box_x = detect_and_track_basketball(frame, force_redetect)
 
-                if ball_detected:
+                if ball_detected and ball_center and ball_box_x:
+                    last_ball_center = ball_center
+                    last_ball_box = ball_box_x
+                    x1, x2 = last_ball_box
+                    dynamic_scale = determine_dynamic_scale(x1, x2)
                     cv2.putText(frame, "🎯 Basketball Detected!", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
-                    wrist_point = tuple(map(int, wrist))
+                     # ✅ Display scale on screen
+                    cv2.putText(frame, f"Scale: {dynamic_scale:.2f} px/m", (50, 230),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
                    
 
                     if is_valid_shooting_pose :
                        # just call the function
                        position = (50, 180)
                        cv2.putText(frame, "valid pose", position, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                       stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
+
+                       stored_release_angle, ball_was_near_wrist, new_points = store_release_angle_if_valid(
     frame, smoothed_angle, wrist, ball_center,
     stored_release_angle, distance_threshold=150,
-    ball_was_near_wrist=ball_was_near_wrist
-)
+    ball_was_near_wrist=ball_was_near_wrist,Newscale=dynamic_scale)
+                       
+                       
+
+
+                       
+
+                       
+                    if new_points:
+                        projectile_points = new_points   
+                    for (x, y) in projectile_points:
+                        if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
+
 
 
 
