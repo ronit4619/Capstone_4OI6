@@ -33,37 +33,6 @@ last_ball_box = None  # will store (x1, x2)
 
 import numpy as np
 
-
-# def store_release_angle_if_valid(frame, smoothed_angle, ball_center, wrist_point, stored_release_angle, threshold=90):
-#     """
-#     Stores the release angle if the ball is far enough from the wrist and pose is valid.
-
-#     Args:
-#         frame (ndarray): Current video frame for annotation.
-#         smoothed_angle (float): Smoothed shoulder-elbow angle.
-#         ball_center (tuple): (x, y) position of the basketball.
-#         wrist_point (tuple): (x, y) position of the wrist.
-#         stored_release_angle (float or None): Currently stored release angle.
-#         threshold (int): Minimum pixel distance between ball and wrist to count as release.
-
-#     Returns:
-#         float: Updated stored release angle.
-#     """
-#     if ball_center is None or wrist_point is None:
-#         return stored_release_angle
-
-#     distance = calculate_distance(ball_center, wrist_point)
-
-#     if distance >= threshold:
-#         stored_release_angle = smoothed_angle
-#         cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°", 
-#                     (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 255), 2)
-
-#     # Draw line and distance regardless
-#     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px", 
-#                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 255), 2)
-
-#     return stored_release_angle
 def determine_facing_direction(landmarks, image_width):
     """
     Determines if the person is facing left or right based on nose and shoulders.
@@ -125,44 +94,9 @@ def calculate_distance(point1, point2):
     """
     return np.linalg.norm(np.array(point1) - np.array(point2))
 
-# def is_basketball_supported_by_wrist_directional(shoulder, elbow, wrist, ball_center, distance_threshold=90, angle_threshold=90):
-#     """
-#     Determines if the basketball is near the wrist and in the direction of the forearm (elbow to wrist).
-
-#     Args:
-#         shoulder, elbow, wrist (tuple): Coordinates of the joint landmarks.
-#         ball_center (tuple): Coordinates of the basketball center.
-#         distance_threshold (float): Max distance between wrist and ball.
-#         angle_threshold (float): Max angle difference between arm direction and ball vector.
-
-#     Returns:
-#         bool: True if ball is near wrist and in shooting direction.
-#     """
-#     if wrist is None or ball_center is None or elbow is None:
-#         return False
-
-#     wrist = np.array(wrist)
-#     elbow = np.array(elbow)
-#     ball_center = np.array(ball_center)
-
-#     arm_direction = wrist - elbow
-#     ball_vector = ball_center - wrist
-
-#     distance = np.linalg.norm(ball_vector)
-#     if distance > distance_threshold:
-#         return False
-
-#     # Normalize vectors to get angle
-#     arm_dir_norm = arm_direction / np.linalg.norm(arm_direction)
-#     ball_vec_norm = ball_vector / np.linalg.norm(ball_vector)
-
-#     dot_product = np.dot(arm_dir_norm, ball_vec_norm)
-#     angle = np.degrees(np.arccos(np.clip(dot_product, -1.0, 1.0)))
-
-#     return angle < angle_threshold
 
 
-def generate_projectile_points(release_angle_deg, v=5.5, g=9.81, scale=135, start_pos=(100, 400)):
+def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, start_pos=(100, 400)):
     angle_rad = np.radians(release_angle_deg)
     t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
     points = []
@@ -202,43 +136,6 @@ def is_ball_near_wrist(wrist, ball_center, threshold=100):
 
     distance = calculate_distance(wrist, ball_center)
     return distance < threshold
-
-
-# def store_release_angle_if_valid(frame, smoothed_angle, shoulder, elbow, wrist, ball_center, stored_release_angle, distance_threshold=150):
-#     """
-#     Stores the release angle if the ball was first supported by the wrist and then moved away.
-
-#     Args:
-#         frame (ndarray): Current video frame for annotation.
-#         smoothed_angle (float): Smoothed shoulder-elbow angle.
-#         shoulder, elbow, wrist (tuple): Joint coordinates.
-#         ball_center (tuple): Basketball center.
-#         stored_release_angle (float or None): Currently stored release angle.
-#         distance_threshold (int): Distance to determine shot release.
-
-#     Returns:
-#         float: Updated stored release angle.
-#     """
-#     if None in [shoulder, elbow, wrist, ball_center]:
-#         return stored_release_angle
-
-#     # Check if the ball was previously supported
-#     if is_ball_near_wrist(wrist, ball_center, threshold=100):
-#         # Now check if it's far enough to be considered a shot
-#         distance = calculate_distance(ball_center, wrist)
-#         if distance >= distance_threshold:
-#             stored_release_angle = smoothed_angle
-#             if stored_release_angle is not None:
-#                            log_release_angle_to_json(stored_release_angle)
-#             cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°", 
-#                         (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-
-#     # Draw distance always for feedback
-#     distance = calculate_distance(ball_center, wrist)
-#     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px", 
-#                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
-
-#     return stored_release_angle
 
 
 def quick_detect_ball(image, max_attempts=10, delay=0.01, confidence_threshold=0.7):
@@ -298,14 +195,8 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
 
 
 
-            release_time = time.time()
-            release_position = ball_center
 
-
-            later_time = time.time()
-            later_position = ball_center  #current ball position
-
-            speed = calculate_release_speed(release_position, release_time, later_position, later_time, Newscale)
+            
 
             # ✅ Generate and return the arc points to store
             if wrist is not None:
@@ -317,37 +208,6 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
 
     return stored_release_angle, ball_was_near_wrist, new_projectile
-
-
-
-
-# def is_valid_shooting_pose_fsm(smoothed_angle, state):
-#     """
-#     Implements a finite state machine to detect a valid shooting pose transition.
-#     Expects angle to go: ~50° ➝ ~0° ➝ ~50°
-
-#     Args:
-#         smoothed_angle (float): Shoulder-elbow smoothed angle.
-#         state (str): Current FSM state.
-
-#     Returns:
-#         new_state (str): Updated FSM state.
-#         is_release_frame (bool): True only when a valid release motion is detected.
-#     """
-#     is_release_frame = False
-
-#     if state == 'ready' and smoothed_angle >= 50:
-#         state = 'releasing'
-#     elif state == 'releasing' and smoothed_angle >= 20:
-#         state = 'recovered'
-#         is_release_frame = True
-#     elif state == 'recovered':
-#         # Reset FSM to allow another detection
-#         state = 'ready'
-
-#     return state, is_release_frame
-
-
 
 def is_valid_shooting_pose(angle): # have to fix the angle
     """
@@ -376,67 +236,6 @@ def get_box_center(x1, y1, x2, y2):
     cx = x1 + (x2 - x1) // 2
     cy = y1 + (y2 - y1) // 2
     return (cx, cy)
-
-
-# def detect_and_track_basketball(image, force_redetect=False):
-#     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
-
-#     current_time = time.time()
-#     if force_redetect:
-#         tracking_ball = False
-#         tracker = None
-#         print("🔄 Manual reset: Forcing re-detection.")
-
-#     # Periodic YOLO re-check every recheck_interval seconds
-#     if tracking_ball and (current_time - last_yolo_check_time > recheck_interval):
-#         print("🔁 Performing periodic YOLO confirmation.")
-#         tracking_ball = False
-#         tracker = None
-
-#     # If currently tracking, try updating with tracker
-#     if tracking_ball and tracker is not None:
-#         success, box = tracker.update(image)
-#         if success:
-#             lost_tracker_frames = 0
-#             x, y, w, h = map(int, box)
-#             cx, cy = get_box_center(x, y, x + w, y + h)
-#             cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-#             cv2.putText(image, "Tracking", (x, y - 10),
-#                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-#             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
-#             return True, (cx, cy)
-#         else:
-#             lost_tracker_frames += 1
-#             if lost_tracker_frames >= tracker_lost_threshold:
-#                 print("🛑 Tracker lost the ball. Switching to re-detection.")
-#                 tracking_ball = False
-#                 tracker = None
-#             return False, None
-
-#     # If not tracking or re-detecting
-#     results = model(image)
-#     last_yolo_check_time = current_time  # reset timer on detection
-#     for result in results:
-#         for box in result.boxes:
-#             class_id = int(box.cls[0])
-#             confidence = float(box.conf[0])
-#             if class_id == 0 and confidence > 0.70:
-#                 x1, y1, x2, y2 = map(int, box.xyxy[0])
-#                 w, h = x2 - x1, y2 - y1
-#                 tracker = cv2.TrackerCSRT_create()
-#                 tracker.init(image, (x1, y1, w, h))
-#                 tracking_ball = True
-#                 lost_tracker_frames = 0
-#                 cx, cy = get_box_center(x1, y1, x2, y2)
-#                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
-#                 label = f"basketball: {confidence:.2f}"
-#                 cv2.putText(image, label, (x1, y1 - 10),
-#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-#                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
-#                 return True, (cx, cy)
-
-#     return False, None ## the return type is boolean for detection and the centre of ther ball
-
 
 
 def detect_and_track_basketball(image, force_redetect=False):
@@ -568,7 +367,7 @@ def process_video():
     #"C:/Users/antho/Downloads/20250325_102838.mp4"
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
-    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0523.MOV")
+    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0526.MOV")
     if not cap.isOpened():
         print("❌ Error: Could not access webcam.")
         return
@@ -578,7 +377,7 @@ def process_video():
     stored_release_angle = None
     angle_buffer = deque(maxlen=7)
 
-    with mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5) as pose:
+    with mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7) as pose:
         # start global variable
         #shooting_state = 'ready'
         ball_was_near_wrist = False
