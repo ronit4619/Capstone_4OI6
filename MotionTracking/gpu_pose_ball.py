@@ -10,6 +10,8 @@ import torch
 import json
 from datetime import datetime
 
+import random
+
 
 torch_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -171,7 +173,7 @@ def quick_detect_ball(image, max_attempts=10, delay=0.01, confidence_threshold=0
 
 def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
                                   stored_release_angle, distance_threshold=150,
-                                  ball_was_near_wrist=False, Newscale=100):
+                                  ball_was_near_wrist=False, Newscale=100,ball_positions=None):
     """
     Detects release and returns updated release angle, state, and projectile points (if any).
     """
@@ -196,18 +198,174 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
 
 
 
-            
-
+            speed=average_x_velocity(ball_positions, px_per_m=Newscale)
             # ✅ Generate and return the arc points to store
             if wrist is not None:
                 start_pos = tuple(map(int, wrist))
-                new_projectile = generate_projectile_points(stored_release_angle, start_pos=start_pos, scale=Newscale)
+                new_projectile = generate_projectile_points(stored_release_angle,v=speed, start_pos=start_pos, scale=Newscale)
 
     # Show distance always
     cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",
                 (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
 
     return stored_release_angle, ball_was_near_wrist, new_projectile
+
+
+
+def average_x_velocity(ball_positions, px_per_m=100, max_pairs=4):
+    """
+    Calculates average horizontal velocity (x-direction) in m/s,
+    and logs it with ball positions and scale.
+    """
+    if ball_positions is None or len(ball_positions) < 2:
+        return None
+
+    recent = list(ball_positions)[-max_pairs:]
+
+    total_dx = 0
+    total_dt = 0
+
+    for i in range(1, len(recent)):
+        t1, (x1, _) = recent[i - 1]
+        t2, (x2, _) = recent[i]
+        dt = t2 - t1
+        if dt > 0:
+            dx_px = x2 - x1
+            total_dx += dx_px
+            total_dt += dt
+
+    if total_dt == 0:
+        return None
+
+    dx_m = total_dx / px_per_m
+    avg_velocity = abs(dx_m / total_dt)
+
+    # Log everything including px_per_m
+    log_release_angle_to_json(
+        release_angle=None,
+        speed=avg_velocity,
+        ball_positions=recent,
+        px_per_m=px_per_m
+    )
+
+    return avg_velocity
+
+
+# def smart_average_velocity(ball_positions, shoulder, px_per_m=100, min_dist_m=0.3, samples=4):
+#     """
+#     Calculates average horizontal velocity in m/s by sampling points
+#     where the ball is at least `min_dist_m` meters away from the shoulder.
+
+#     Logs the speed, positions used, and px_per_m.
+#     """
+#     valid = [
+#         (t, (x, y)) for t, (x, y) in ball_positions
+#         if calculate_distance((x, y), shoulder) >= min_dist_m * px_per_m
+#     ]
+
+#     # ✅ Ensure at least 2 valid points
+#     if len(valid) < 2:
+#         return None
+
+#     # Sample safely: at least 2, at most all
+#     n_to_sample = min(samples, len(valid))
+#     if n_to_sample < 2:
+#         return None
+
+#     sampled = random.sample(valid, n_to_sample)
+#     sampled.sort(key=lambda x: x[0])  # sort by time
+
+#     total_dx = 0
+#     total_dt = 0
+#     for i in range(1, len(sampled)):
+#         t1, (x1, _) = sampled[i - 1]
+#         t2, (x2, _) = sampled[i]
+#         dt = t2 - t1
+#         if dt > 0:
+#             total_dx += x2 - x1
+#             total_dt += dt
+
+#     if total_dt == 0:
+#         return None
+
+#     dx_m = total_dx / px_per_m
+#     avg_velocity = abs(dx_m / total_dt)
+
+#     log_release_angle_to_json(
+#         release_angle=None,
+#         speed=avg_velocity,
+#         ball_positions=sampled,
+#         px_per_m=px_per_m
+#     )
+
+#     return avg_velocity
+
+
+
+def log_release_angle_to_json(release_angle=None, speed=None, ball_positions=None, px_per_m=None, filename="release_spped_time.json"):
+    """
+    Logs release angle, speed, ball positions, and px_per_m into a JSON file.
+    """
+    data = []
+
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    entry = {
+        "timestamp": datetime.now().isoformat()
+    }
+
+    if release_angle is not None:
+        entry["release_angle"] = round(release_angle, 2)
+
+    if speed is not None:
+        entry["release_speed_mps"] = round(speed, 3)
+
+    if ball_positions is not None:
+        entry["ball_positions"] = [
+            {
+                "time": t,
+                "x": int(xy[0]),
+                "y": int(xy[1])
+            } for t, xy in ball_positions
+        ]
+
+    if px_per_m is not None:
+        entry["px_per_m"] = round(px_per_m, 2)
+
+    data.append(entry)
+
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+
+
+
+
+def log_release_speed_to_json(speed, filename="release_speeds.json"):
+    data = []
+
+    # Try loading existing data
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # File doesn't exist or is malformed
+
+    # Append new entry
+    data.append({
+        "timestamp": datetime.now().isoformat(),
+        "average_release_speed_mps": round(speed, 3)
+    })
+
+    # Save to file
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+
 
 def is_valid_shooting_pose(angle): # have to fix the angle
     """
@@ -318,39 +476,9 @@ def determine_dynamic_scale(x1, x2, real_diameter_m=0.24):
 
 
 
-
-def calculate_release_speed(pos1, t1, pos2, t2, pixels_per_meter):
-    """
-    Calculates horizontal release speed (m/s) between two points.
-
-    Args:
-        pos1 (tuple): (x, y) of ball at release.
-        t1 (float): Timestamp of release (seconds).
-        pos2 (tuple): (x, y) of ball shortly after release.
-        t2 (float): Timestamp of second point (seconds).
-        pixels_per_meter (float): Pixel-to-meter scale based on ball diameter.
-
-    Returns:
-        float: Estimated horizontal speed in m/s.
-    """
-    if None in [pos1, pos2, t1, t2] or t2 <= t1:
-        return None
-
-    dx_px = pos2[0] - pos1[0]
-    dx_m = dx_px / pixels_per_meter
-    dt = t2 - t1
-
-    return dx_m / dt
-
-
-
-
-
 def process_video():
 
     projectile_points = []
-
-
     arm_choice = input("👉 Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
     if arm_choice not in ['left', 'right']:
         print("❌ Invalid choice. Please enter 'left' or 'right'.")
@@ -376,6 +504,10 @@ def process_video():
     print("🎮 Press 'R' to re-detect basketball | 'Q' to quit")
     stored_release_angle = None
     angle_buffer = deque(maxlen=7)
+    ball_position_buffer = deque(maxlen=20)  # stores (time, (x, y)) tuples
+
+
+
 
     with mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7) as pose:
         # start global variable
@@ -435,9 +567,6 @@ def process_video():
                 smoothed_angle = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1] \
                     if len(angle_buffer) == angle_buffer.maxlen else shoulder_elbow_angle
                 
-
-                
-                
                 # Compare z-coordinates
                 if dominant_shoulder_z > non_dominant_shoulder_z:
                     smoothed_angle=180-smoothed_angle
@@ -454,6 +583,16 @@ def process_video():
                     last_ball_box = ball_box_x
                     x1, x2 = last_ball_box
                     dynamic_scale = determine_dynamic_scale(x1, x2)
+
+
+                    # recently added
+                    if (
+                        ball_center[1] < shoulder[1] and  # Ball is above shoulder
+                        calculate_distance(ball_center, shoulder) * dynamic_scale >= 1 * dynamic_scale  # Ball is 0.3m away
+                    ):
+                        ball_position_buffer.append((time.time(), ball_center))
+
+
                     cv2.putText(frame, "🎯 Basketball Detected!", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
                      # ✅ Display scale on screen
@@ -468,7 +607,7 @@ def process_video():
                        stored_release_angle, ball_was_near_wrist, new_points = store_release_angle_if_valid(
     frame, smoothed_angle, wrist, ball_center,
     stored_release_angle, distance_threshold=150,
-    ball_was_near_wrist=ball_was_near_wrist,Newscale=dynamic_scale)
+    ball_was_near_wrist=ball_was_near_wrist,Newscale=dynamic_scale,ball_positions=ball_position_buffer)
                        
                        
 
