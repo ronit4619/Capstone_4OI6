@@ -1,0 +1,13 @@
+opencv-python
+numpy
+ffmpeg-python
+torch
+torchvision
+torchaudio
+torchmetrics
+ultralytics
+scikit-learn
+mediapipe
+pandas
+matplotlib
+seaborn
