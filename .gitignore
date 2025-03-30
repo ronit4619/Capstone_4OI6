@@ -17,3 +17,5 @@ Front_End/js/node_modules/.bin/bcrypt
 /Front_End/js/package.json
 *.avi
 stubs/track_stubs.pkl
+/async_analysis/models
+/async_analysis/input_videos
