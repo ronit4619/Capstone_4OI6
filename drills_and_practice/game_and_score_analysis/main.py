@@ -12,6 +12,13 @@ from queue import Queue
 from math import acos, degrees, sqrt
 
 
+#shot from left, right, center three point.
+
+#see accuracy from each spot
+
+#see accuracy for free throw
+#see accuracy for three pointer
+
 #python .\main.py --mode video --input Shot_1.mp4 --output output2.avi
 #python .\main.py --mode realtime --output output2.avi
 

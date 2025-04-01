@@ -88,40 +88,12 @@
 
   <!-- Main Menu (Live Analysis & Upload Session) -->
   <div class="main-menu" id="mainMenu">
-      <button class="option-button" onclick="showPage('livePage')">Live Analysis 🏀</button>
-      <button class="option-button" onclick="showPage('uploadPage')">Upload Session 📤</button>
+    <button class="option-button" onclick="window.location.href='live.html'">Live Analysis 🏀</button>
+    <button class="option-button" onclick="window.location.href='upload.html'">Upload Session 📤</button>    
   </div>
 
   <button class="back-btn hidden" onclick="showMainMenu()">← Back</button>
 </div>
-<!-- Live Analysis Page -->
-<div class="page-content hidden" id="livePage">
-  <div class="content-wrapper">
-      <h2>Live Analysis 🏀</h2>
-      <div class="video-preview">
-          <video id="videoFeed" autoplay></video>
-      </div>
-      <button onclick="toggleCamera()" id="cameraToggle">Start Camera</button>
-  </div>
-</div>
-
-<!-- Upload Session Page -->
-<div class="page-content hidden" id="uploadPage">
-  <div class="content-wrapper">
-      <h2>Upload Session 📤</h2>
-      <div class="upload-container" onclick="document.getElementById('fileInput').click()">
-          <p>Click to upload basketball video</p>
-          <p>(MP4, AVI, MOV | Max 500MB)</p>
-      </div>
-      <input type="file" id="fileInput" accept="video/*">
-      <div class="video-preview hidden" id="uploadPreview">
-          <video id="uploadedVideo" controls></video>
-      </div>
-  </div>
-</div>
-
-
-
 
   <!-- Link to external JavaScript file -->
   <script src="js/app.js"></script>

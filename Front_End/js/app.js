@@ -1,21 +1,20 @@
-const API_URL = "http://localhost:5000"; // Change if running on a different host
+const API_URL = "http://localhost:5000"; // For login/register
+const ANALYSIS_BACKEND_URL = "http://localhost:8001"; // Flask backend to trigger Python scripts
 
 /****************************************
  *          Authentication Logic
  ****************************************/
 
-// ✅ Stop camera function
 function stopCamera() {
   let video = document.getElementById('videoFeed');
   if (video && video.srcObject) {
-      let stream = video.srcObject;
-      let tracks = stream.getTracks();
-      tracks.forEach(track => track.stop()); // Stop all media tracks
-      video.srcObject = null; // Clear the video stream
+    let stream = video.srcObject;
+    let tracks = stream.getTracks();
+    tracks.forEach(track => track.stop());
+    video.srcObject = null;
   }
 }
 
-// ✅ Switch between Login and Register
 function showRegister() {
   document.getElementById("loginBox").classList.add("hidden");
   document.getElementById("registerBox").classList.remove("hidden");
@@ -26,7 +25,6 @@ function showLogin() {
   document.getElementById("loginBox").classList.remove("hidden");
 }
 
-// ✅ Login Function
 async function login() {
   const username = document.getElementById("loginUsername").value;
   const password = document.getElementById("loginPassword").value;
@@ -42,18 +40,12 @@ async function login() {
 
     if (response.ok) {
       localStorage.setItem("jwtToken", result.token);
-      localStorage.setItem("loggedInUser", username); // Store username
-
-      console.log("Stored Token:", localStorage.getItem("jwtToken")); // ✅ Debugging
-      console.log("Stored User:", localStorage.getItem("loggedInUser")); // ✅ Debugging
-
+      localStorage.setItem("loggedInUser", username);
 
       alert("Login successful!");
-      
       document.getElementById("authContainer").style.display = "none";
       document.getElementById("dashboard").style.display = "block";
-
-      updateWelcomeMessage(); // Call function to update username display
+      updateWelcomeMessage();
     } else {
       alert(result.message);
     }
@@ -62,7 +54,6 @@ async function login() {
   }
 }
 
-// ✅ Update welcome message with username
 function updateWelcomeMessage() {
   const username = localStorage.getItem("loggedInUser");
   if (username) {
@@ -72,7 +63,6 @@ function updateWelcomeMessage() {
   }
 }
 
-// ✅ Auto-load dashboard if logged in (on page refresh)
 document.addEventListener("DOMContentLoaded", () => {
   if (localStorage.getItem("jwtToken")) {
     document.getElementById("authContainer").style.display = "none";
@@ -84,22 +74,17 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-// ✅ Logout Function
 function logout() {
-  localStorage.removeItem("jwtToken"); 
-  localStorage.removeItem("loggedInUser"); // Clear stored username
+  localStorage.removeItem("jwtToken");
+  localStorage.removeItem("loggedInUser");
 
-  stopCamera(); 
+  stopCamera();
   clearUploadPreview();
-  
-  // Show login screen and hide dashboard
+
   document.getElementById("authContainer").style.display = "flex";
   document.getElementById("dashboard").style.display = "none";
-
-  // Reset welcome message to default
   document.getElementById("welcomeMessage").innerText = "Welcome! 🏀";
 
-  // Ensure the main menu is reset
   if (document.getElementById("mainMenu")) {
     showMainMenu();
   }
@@ -108,9 +93,10 @@ function logout() {
 /****************************************
  *          Registration Logic
  ****************************************/
+
 async function register() {
   const username = document.getElementById("registerUsername").value;
-  const email = document.getElementById("registerEmail").value;  // Get email from input
+  const email = document.getElementById("registerEmail").value;
   const password = document.getElementById("registerPassword").value;
   const confirmPass = document.getElementById("confirmPassword").value;
   const privacyPolicyChecked = document.getElementById("privacyPolicy").checked;
@@ -135,7 +121,7 @@ async function register() {
     const response = await fetch(`${API_URL}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password, birthday: dob })  // ✅ Include email
+      body: JSON.stringify({ username, email, password, birthday: dob })
     });
 
     const result = await response.json();
@@ -155,6 +141,7 @@ async function register() {
 /****************************************
  *          Navigation Logic
  ****************************************/
+
 function showMainMenu() {
   document.getElementById("mainMenu").style.display = "flex";
   document.querySelectorAll(".page-content").forEach((p) =>
@@ -172,37 +159,114 @@ function showPage(pageId) {
 /****************************************
  *          File Upload Logic
  ****************************************/
+
+async function analyzeVideo() {
+  const fileInput = document.getElementById("fileInput");
+  const resultBox = document.getElementById("analysisResult");
+
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append("video", file);
+
+  try {
+    const res = await fetch(`${ANALYSIS_BACKEND_URL}/analyze`, {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await res.json();
+    resultBox.innerText = data.result;
+  } catch (err) {
+    resultBox.innerText = "Error analyzing video: " + err.message;
+  }
+}
+
 document.getElementById("fileInput").addEventListener("change", function (e) {
   const file = e.target.files[0];
   const preview = document.getElementById("uploadPreview");
   const video = document.getElementById("uploadedVideo");
+  const analyzeBtn = document.getElementById("analyzeButton");
 
   if (file && file.type.startsWith("video/")) {
     const url = URL.createObjectURL(file);
     video.src = url;
     preview.classList.remove("hidden");
+    analyzeBtn.classList.remove("hidden");
   } else {
     alert("Please select a valid video file");
+    preview.classList.add("hidden");
+    analyzeBtn.classList.add("hidden");
   }
 });
 
-function clearUploadPreview() {
-  const preview = document.getElementById("uploadPreview");
-  const video = document.getElementById("uploadedVideo");
-  preview.classList.add("hidden");
-  video.src = "";
-  document.getElementById("fileInput").value = "";
+/****************************************
+ *   Live Analysis Start/Stop Logic
+ ****************************************/
+
+function startAnalysis(type) {
+  const loader = document.getElementById("loader");
+  const videoImage = document.getElementById("liveStreamImage");
+
+  loader.style.display = "block";
+  videoImage.style.display = "none";
+
+  fetch(`${ANALYSIS_BACKEND_URL}/start-analysis`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type: type }),
+  })
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.status === "ok") {
+        setTimeout(() => {
+          videoImage.src = "http://127.0.0.1:8002/video";
+          videoImage.style.display = "block";
+          loader.style.display = "none";
+        }, 5000);
+      } else {
+        loader.style.display = "none";
+        alert("Server error starting analysis.");
+      }
+    })
+    .catch((err) => {
+      loader.style.display = "none";
+      console.error(err);
+      alert("Server error starting analysis.");
+    });
 }
 
-// Delete Account Functio
+
+function stopAnalysis() {
+  fetch(`${ANALYSIS_BACKEND_URL}/stop-analysis`, {
+    method: "POST"
+  })
+  .then((res) => res.json())
+  .then((data) => {
+    if (data.status === "ok") {
+      const frame = document.getElementById("liveStreamFrame");
+      frame.style.display = "none";  // Hide the iframe
+      frame.src = ""; // Clear the source to stop trying to reload
+      alert("Analysis stopped.");
+    } else {
+      alert("No analysis was running.");
+    }
+  })
+  .catch((err) => {
+    console.error(err);
+    alert("Failed to stop analysis.");
+  });
+}
+
+
+
+/****************************************
+ *  Other
+ ****************************************/
 
 function changePassword() {
   window.location.href = "change-password.html";
 }
 
-/****************************************
- *  Stop camera on page unload (optional)
- ****************************************/
 window.addEventListener("beforeunload", () => {
   stopCamera();
 });
