@@ -154,38 +154,6 @@ def is_ball_near_wrist(wrist, ball_center, threshold=100):
     distance = calculate_distance(wrist, ball_center)
     return distance < threshold
 
-
-def quick_detect_ball(image, max_attempts=10, delay=0.01, confidence_threshold=0.7):
-    """
-    Detects the basketball using YOLO and waits until it is found or max_attempts is reached.
-
-    Args:
-        image (ndarray): The current video frame.
-        max_attempts (int): Max retries before giving up.
-        delay (float): Delay in seconds between attempts.
-        confidence_threshold (float): Minimum confidence to accept detection.
-
-    Returns:
-        tuple or None: (x, y) center of basketball if found, else None.
-    """
-    for _ in range(max_attempts):
-        results = model(image)
-
-        for result in results:
-            for box in result.boxes:
-                class_id = int(box.cls[0])
-                confidence = float(box.conf[0])
-
-                if class_id == 0 and confidence > confidence_threshold:
-                    x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    cx = x1 + (x2 - x1) // 2
-                    cy = y1 + (y2 - y1) // 2
-                    return (cx, cy)
-
-        time.sleep(delay)
-
-    return None  # Ball wasn't detected within allowed attempts
-
 def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
                                   stored_release_angle, distance_threshold=150,
                                   ball_was_near_wrist=False, Newscale=100,speed=None):
@@ -222,33 +190,41 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
     return stored_release_angle, ball_was_near_wrist     #, new_projectile
  
 
-def average_x_velocity(ball_positions):
+def average_initial_velocity(ball_positions):
     """
-    Calculates instantaneous horizontal velocity (x-direction) in m/s,
-    using the last two points. Also logs to JSON with scale info.
+    Calculates the initial velocity (in m/s) using both x and y directions
+    from the last two tracked ball positions.
     """
     if ball_positions is None or len(ball_positions) < 2:
         return None
 
-    (t1, (x1, _), scale1), (t2, (x2, _), scale2) = list(ball_positions)[-2:]
+    (t1, (x1, y1), scale1), (t2, (x2, y2), scale2) = list(ball_positions)[-2:]
 
     dt = t2 - t1
     if dt <= 0:
         return None
 
     dx_px = x2 - x1
-    dx_m = dx_px / scale2
-    avg_velocity = abs(dx_m / dt)
+    dy_px = y2 - y1
+    avg_scale = (scale1 + scale2) / 2
 
-    # Log everything including scale
+    dx_m = dx_px / avg_scale
+    dy_m = dy_px / avg_scale
+
+    vx = dx_m / dt
+    vy = dy_m / dt
+    v = (vx ** 2 + vy ** 2) ** 0.5
+
+    # Log everything
     log_release_angle_to_json(
         release_angle=None,
-        speed=avg_velocity,
-        ball_positions=[(t1, (x1, _)), (t2, (x2, _))],
-        px_per_m=scale2
+        speed=v,
+        ball_positions=[(t1, (x1, y1)), (t2, (x2, y2))],
+        px_per_m=avg_scale
     )
 
-    return avg_velocity
+    return v
+
 
 def log_release_angle_to_json(release_angle=None, speed=None, ball_positions=None, px_per_m=None, filename="release_spped_time.json"):
     """
@@ -399,7 +375,7 @@ def detect_and_track_basketball(image, force_redetect=False):
     return False, None, None  # when no detection
 
 
-def determine_dynamic_scale(x1, x2, real_diameter_m=0.24):
+def determine_dynamic_scale(x1, x2,real_diameter_m=0.24):
     """
     Calculates pixels-per-meter scale using basketball diameter.
 
@@ -411,41 +387,13 @@ def determine_dynamic_scale(x1, x2, real_diameter_m=0.24):
     Returns:
         float: Scale in pixels per meter.
     """
-    pixel_diameter = abs(x2 - x1)
+    pixel_diameter = abs(x2 - x1) 
+    
     if pixel_diameter == 0:
         return None  # Avoid division by zero
-    return pixel_diameter / real_diameter_m
+    return pixel_diameter / (real_diameter_m )
 
-def gather_position_buffer(ball_center, shoulder, dynamic_scale, frame):
-    global sampling, sample_start_time, last_snapshot_time, ball_position_buffer
 
-    snapshot_interval = 0.1
-    sample_duration = 0.4
-    current_time = time.time()
-
-    if (
-        ball_center[1] < shoulder[1] and
-        calculate_distance(ball_center, shoulder) * dynamic_scale >= 1 * dynamic_scale
-    ):
-        if not sampling:
-            sampling = True
-            sample_start_time = current_time
-            last_snapshot_time = current_time
-            ball_position_buffer = [(current_time, ball_center)]
-            frame[:] = (0, 255, 0)
-
-        elif current_time - sample_start_time <= sample_duration:
-            if current_time - last_snapshot_time >= snapshot_interval:
-                ball_position_buffer.append((current_time, ball_center))
-                last_snapshot_time = current_time
-                frame[:] = (0, 255, 0)
-
-        elif current_time - sample_start_time > sample_duration:
-            sampling = False
-            print("Collected positions for velocity:", ball_position_buffer)
-            return ball_position_buffer
-
-    return None  # Not done sampling yet or condition not met
 
 def velocity_consumer():
     global latest_speed
@@ -461,7 +409,7 @@ def velocity_consumer():
             ball_position_buffer.append((video_time, ball_center,dynamic_scale))
 
             if len(ball_position_buffer) >= 2:
-                avg_vel = average_x_velocity(ball_position_buffer)
+                avg_vel = average_initial_velocity(ball_position_buffer)
                 if avg_vel is not None:
                     with speed_lock:
                         latest_speed = avg_vel  # ✅ Safely update global speed
@@ -491,7 +439,7 @@ def process_video():
     #"C:/Users/antho/Downloads/20250325_102838.mp4"
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
-    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0523.MOV")
+    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0526.MOV")
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
         print("❌ Error: Could not access webcam.")
@@ -587,12 +535,20 @@ def process_video():
                         calculate_distance(ball_center, shoulder) * dynamic_scale >= 1 * dynamic_scale  # Ball is 0.3m away
                     ):
                         frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))  # Get current frame number
-                        video_time = frame_idx / fps                       # Calculate true video time (in seconds)
+                        video_time = frame_idx / (fps+1)                       # Calculate true video time (in seconds)
 
                         current_time = time.time()
                         #ball_position_buffer.append((video_time, ball_center))
                         ball_queue.put((video_time, ball_center,dynamic_scale)) # multi thread
                         #frame[:] = (0, 255, 0)  # Fill screen with green
+                        
+                        x, y = int(ball_center[0]), int(ball_center[1])
+                        size = 8  # size of the X arms
+                        color = (0, 255, 0)  # Green in BGR
+                        thickness = 2
+
+                        cv2.line(frame, (x - size, y - size), (x + size, y + size), color, thickness)
+                        cv2.line(frame, (x - size, y + size), (x + size, y - size), color, thickness)
 
                         # Log entry
                         entry = {
