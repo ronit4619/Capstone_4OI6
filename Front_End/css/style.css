@@ -4,61 +4,60 @@
     padding: 0;
     box-sizing: border-box;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-}
-
-body {
+  }
+  
+  body {
     background: linear-gradient(135deg, #ff6b35, #ff8e53);
     position: relative;
     overflow-x: hidden;
-}
-
-/* -------------- Background Emojis -------------- */
-.basketball-bg {
+  }
+  
+  /* -------------- Background Emojis -------------- */
+  .basketball-bg {
     position: fixed;
     opacity: 0.1;
     font-size: 150px;
     z-index: -1;
-}
-
-/* -------------- Auth Container -------------- */
-.auth-container {
+  }
+  
+  /* -------------- Auth Container -------------- */
+  .auth-container {
     display: flex;
     justify-content: center;
-    align-items: flex-start; /* Aligns the login box higher */
+    align-items: flex-start;
     height: 100vh;
-    padding-top: 5vh; /* Adjust this value to move it higher */
-}
-
-
-.auth-box {
+    padding-top: 5vh;
+  }
+  
+  .auth-box {
     background: rgba(255, 255, 255, 0.95);
     padding: 2rem;
     border-radius: 15px;
     width: 400px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(10px);
-}
-
-.auth-form {
+  }
+  
+  .auth-form {
     display: flex;
     flex-direction: column;
     gap: 1rem;
-}
-
-input {
+  }
+  
+  input {
     padding: 12px;
     border: 2px solid #ff6b35;
     border-radius: 8px;
     font-size: 16px;
     transition: border-color 0.3s;
-}
-
-input:focus {
+  }
+  
+  input:focus {
     outline: none;
     border-color: #ff8e53;
-}
-
-button {
+  }
+  
+  button {
     padding: 12px;
     background: #ff6b35;
     color: white;
@@ -67,15 +66,15 @@ button {
     cursor: pointer;
     font-size: 16px;
     transition: background 0.3s, transform 0.2s;
-}
-
-button:hover {
+  }
+  
+  button:hover {
     background: #ff5722;
     transform: translateY(-2px);
-}
-
-/* -------------- Privacy Policy -------------- */
-.privacy-container {
+  }
+  
+  /* -------------- Privacy Policy -------------- */
+  .privacy-container {
     max-width: 800px;
     margin: 100px auto;
     background: rgba(255, 255, 255, 0.95);
@@ -83,29 +82,29 @@ button:hover {
     border-radius: 15px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     backdrop-filter: blur(10px);
-}
-
-.privacy-container h1 {
+  }
+  
+  .privacy-container h1 {
     color: #ff6b35;
     margin-bottom: 1rem;
     text-align: center;
-}  
-
-#parentConsentSection {
+  }
+  
+  #parentConsentSection {
     background: rgba(255, 0, 0, 0.05);
     padding: 1rem;
     border-radius: 8px;
     margin-top: 1rem;
-  }  
+  }
   
-/* -------------- Dashboard -------------- */
+  /* -------------- Dashboard Styles -------------- */
 .dashboard {
     display: none;
     height: 100vh;
     position: relative;
-}
-
-.logout-btn {
+  }
+  
+  .logout-btn {
     position: fixed;
     top: 30px;
     right: 20px;
@@ -116,205 +115,9 @@ button:hover {
     border: none;
     cursor: pointer;
     z-index: 1000;
-}
-
-.main-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 2rem;
-    align-items: center;
-    justify-content: center;
-    height: calc(100vh - 120px);
-    padding: 80px 2rem 2rem;
-}
-
-.option-button {
-    width: 300px;
-    padding: 2rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    text-align: center;
-    cursor: pointer;
-    transition: transform 0.2s;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    border: none;
-    font-size: 24px;
-    color: #ff6b35;
-}
-
-.option-button:hover {
-    transform: translateY(-5px);
-}
-
-.back-btn {
-    position: fixed;
-    top: 30px;
-    left: 20px;
-    padding: 10px 25px;
-    background: #ff6b35;
-    border-radius: 25px;
-    color: white;
-    border: none;
-    cursor: pointer;
-    z-index: 1000;
-}
-
-.page-content {
-    display: none;
-    padding: 80px 2rem 2rem;
-    height: calc(100vh - 120px);
-}
-
-.active-page {
-    display: block;
-}
-
-.camera-section,
-.upload-section {
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    backdrop-filter: blur(10px);
-    height: 100%;
-}
-
-.video-preview {
-    width: 100%;
-    height: 400px;
-    border-radius: 10px;
-    background: #333;
-    margin: 1rem 0;
-}
-
-#videoFeed {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 10px;
-}
-
-.upload-container {
-    border: 2px dashed #ff6b35;
-    border-radius: 10px;
-    padding: 2rem;
-    text-align: center;
-    cursor: pointer;
-    transition: background 0.3s;
-    margin: 1rem 0;
-}
-
-.upload-container:hover {
-    background: rgba(255, 107, 53, 0.1);
-}
-
-#fileInput {
-    display: none;
-}
-
-.hidden {
-    display: none;
-}
-
-/* Improve the welcome text visibility */
-.welcome-text {
-    text-align: center;
-    font-size: 2rem;
-    font-weight: bold;
-    color: white !important; /* Force white text */
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5); /* Improve contrast */
-    margin-top: 20px;
-    position: relative;
-    z-index: 10; /* Make sure it's not hidden behind other elements */
-}
-/* User Dropdown Styling */
-.user-dropdown {
-    position: absolute; /* Prevents shifting content */
-    top: 20px;
-    right: 20px;
-    z-index: 1000;
-}
-
-/* Account Button */
-.user-btn {
-    background: #dc3545;
-    color: white;
-    border: none;
-    border-radius: 25px;
-    padding: 10px 20px;
-    cursor: pointer;
-    font-size: 16px;
-    transition: background 0.3s;
-}
-
-.user-btn:hover {
-    background: #b52d3a;
-}
-
-/* Dropdown Content */
-.dropdown-content {
-    display: none;
-    position: absolute;
-    right: 0;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    min-width: 180px;
-    overflow: hidden;
-}
-
-/* Dropdown Buttons */
-.dropdown-content button {
-    width: 100%;
-    padding: 10px;
-    border: none;
-    background: white;
-    color: black;
-    text-align: left;
-    cursor: pointer;
-    font-size: 14px;
-    transition: background 0.3s;
-}
-
-.dropdown-content button:hover {
-    background: #f5f5f5;
-}
-
-/* Show Dropdown on Hover */
-.user-dropdown:hover .dropdown-content {
-    display: block;
-}
-
-/* Main Menu (Live Analysis & Upload Session) */
-.main-menu {
-    display: flex;
-    flex-direction: column;
-    gap: 1.5rem;
-    align-items: center;
-    justify-content: center;
-    height: 80vh;
-    padding: 20px;
-}
-
-.option-button {
-    width: 300px;
-    padding: 1.5rem;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 15px;
-    text-align: center;
-    cursor: pointer;
-    transition: transform 0.2s;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-    border: none;
-    font-size: 24px;
-    color: #ff6b35;
-}
-
-.option-button:hover {
-    transform: translateY(-5px);
-}
-
-.logo-container {
+  }
+  
+  .logo-container {
     display: flex;
     justify-content: center;
     margin-bottom: 5rem;
@@ -326,3 +129,287 @@ button:hover {
     height: auto;
     border-radius: 50%; /* Optional: makes the logo circular */
 }
+  
+  .main-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    align-items: center;
+    justify-content: center;
+    height: 80vh;
+    padding: 20px;
+  }
+  
+  .option-button {
+    width: 300px;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    text-align: center;
+    cursor: pointer;
+    transition: transform 0.2s;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: none;
+    font-size: 24px;
+    color: #ff6b35;
+  }
+  
+  .option-button:hover {
+    transform: translateY(-5px);
+  }
+  
+  
+  /* -------------- Page Navigation Buttons -------------- */
+  .back-btn {
+    position: fixed;
+    top: 30px;
+    left: 20px;
+    padding: 10px 25px;
+    background: #ff6b35;
+    border-radius: 25px;
+    color: white;
+    border: none;
+    cursor: pointer;
+    z-index: 1000;
+  }
+  
+  .back-button {
+    background: white;
+    color: #ff6b35;
+    border: none;
+    border-radius: 12px;
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    transition: background-color 0.3s, transform 0.2s, color 0.3s;
+    display: inline-block;
+  }
+  
+  .back-button:hover {
+    background-color: #ffe9e0;
+    color: #ff5722;
+    transform: translateY(-2px);
+  }
+  
+  /* -------------- Page Content -------------- */
+  .page-content {
+    display: none;
+    padding: 80px 2rem 2rem;
+    height: calc(100vh - 120px);
+  }
+  
+  .active-page {
+    display: block;
+  }
+  
+  .camera-section,
+  .upload-section {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    height: 100%;
+  }
+
+  .analysis-type-buttons button {
+    margin: 0.5rem;
+    padding: 12px 24px;
+    background-color: #ff6b35;
+    border: none;
+    color: white;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+  }
+  
+  .analysis-type-buttons button:hover {
+    background-color: #ff5722;
+  }
+  
+  
+  /* Shared content layout for upload & live pages */
+  .shared-content {
+    max-width: 600px;
+    margin: 0 auto;
+    padding-top: 3rem;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+  }
+  
+  /* -------------- Video Section -------------- */
+  .video-preview {
+    width: 100%;
+    height: 400px;
+    border-radius: 10px;
+    background: #333;
+    margin: 1rem 0;
+  }
+  
+  #videoFeed {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+  
+  /* -------------- Upload Styles -------------- */
+  .upload-container {
+    border: 2px dashed #ff6b35;
+    border-radius: 10px;
+    padding: 2rem;
+    text-align: center;
+    cursor: pointer;
+    transition: background 0.3s;
+    margin: 1rem 0;
+    background: rgba(255, 255, 255, 0.9);
+    font-weight: bold;
+  }
+  
+  .upload-container:hover {
+    background: rgba(255, 107, 53, 0.1);
+  }
+  
+  #fileInput {
+    display: none;
+  }
+  
+  /* -------------- Header Bar -------------- */
+  .header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1.5rem 2rem;
+    position: relative;
+  }
+  
+  .header-left,
+  .header-center,
+  .header-right {
+    flex: 1;
+    display: flex;
+    align-items: center;
+  }
+  
+  .header-left {
+    justify-content: flex-start;
+  }
+  
+  .header-right {
+    justify-content: flex-end;
+  }
+  
+  .header-center {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    justify-content: center;
+  }
+  
+  .header-bar h2 {
+    font-size: 2rem;
+    font-weight: bold;
+    color: white;
+    margin: 0;
+    text-align: center;
+  }
+  
+  .header-bar .logo {
+    width: 60px;
+    height: 60px;
+    object-fit: contain;
+    border-radius: 50%;
+  }
+  
+  /* Mobile Responsive */
+  @media (max-width: 600px) {
+    .header-bar {
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+  
+    .header-center {
+      position: static;
+      transform: none;
+    }
+  
+    .header-bar h2 {
+      font-size: 1.5rem;
+    }
+  }
+  
+  /* -------------- Misc Utilities -------------- */
+  .hidden {
+    display: none;
+  }
+  
+  .welcome-text {
+    text-align: center;
+    font-size: 2rem;
+    font-weight: bold;
+    color: white !important;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+    margin-top: 20px;
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* -------------- User Dropdown -------------- */
+  .user-dropdown {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    z-index: 1000;
+  }
+  
+  .user-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 25px;
+    padding: 10px 20px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+  }
+  
+  .user-btn:hover {
+    background: #b52d3a;
+  }
+  
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    min-width: 180px;
+    overflow: hidden;
+  }
+  
+  .dropdown-content button {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    background: white;
+    color: black;
+    text-align: left;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s;
+  }
+  
+  .dropdown-content button:hover {
+    background: #f5f5f5;
+  }
+  
+  .user-dropdown:hover .dropdown-content {
+    display: block;
+  }
+  
