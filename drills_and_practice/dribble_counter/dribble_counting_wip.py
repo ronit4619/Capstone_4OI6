@@ -9,8 +9,8 @@ class DribbleCounter:
         self.model = YOLO("dribble_counting.pt")
         
         # Open the video file for processing
-        #self.cap = cv2.VideoCapture("drib.mp4")
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture("drib.mp4")
+        #self.cap = cv2.VideoCapture(0)
 
         
         # Set the input video FPS (frames per second)
