@@ -34,7 +34,7 @@ last_ball_box = None  # will store (x1, x2)
 
 latest_speed = None
 speed_lock = Lock()
-
+############### SMALL FUNCTIONS#########################################
 def determine_facing_direction(landmarks, image_width):
     """
     Determines if the person is facing left or right based on nose and shoulders.
@@ -61,28 +61,6 @@ def determine_facing_direction(landmarks, image_width):
         return 'undetermined'
 
 
-
-def log_release_angle_to_json(release_angle, filename="release_angles.json"):
-    data = []
-
-    # Try loading existing data
-    try:
-        with open(filename, "r") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass  # File doesn't exist yet or is empty
-
-    # Add new release
-    data.append({
-        "timestamp": datetime.now().isoformat(),
-        "release_angle": round(release_angle, 2)
-    })
-
-    # Write updated list back to file
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=4)
-
-
 def calculate_distance(point1, point2):
     """
     Calculates the Euclidean distance between two (x, y) points.
@@ -96,217 +74,6 @@ def calculate_distance(point1, point2):
     """
     return np.linalg.norm(np.array(point1) - np.array(point2))
 
-
-
-def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, start_pos=(100, 400)):
-   
-
-    angle_rad = np.radians(release_angle_deg)
-    t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
-    points = []
-
-    for t in t_vals:
-        x = v * np.cos(angle_rad) * t
-        y = v * np.sin(angle_rad) * t - 0.5 * g * t**2
-        x_px = int(start_pos[0] + x * scale)
-        y_px = int(start_pos[1] - y * scale)
-        points.append((x_px, y_px))
-
-    # ✅ Log angle, velocity, and scale
-    log_data = {
-        "launch_angle_deg": round(release_angle_deg, 2),
-        "velocity_mps": round(v, 2),
-        "scale_px_per_m": round(scale, 2)
-    }
-
-    filename = "generate_projectile_points_log.json"
-    existing_logs = []
-
-    try:
-        with open(filename, "r") as f:
-            existing_logs = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
-    existing_logs.append(log_data)
-
-    with open(filename, "w") as f:
-        json.dump(existing_logs, f, indent=4)
-
-    return points
-
-
-def is_ball_near_wrist(wrist, ball_center, threshold=100):
-    """
-    Returns True if the ball is within a certain pixel distance of the wrist.
-
-    Args:
-        wrist (tuple): (x, y) coordinates of the wrist.
-        ball_center (tuple): (x, y) coordinates of the basketball.
-        threshold (int): Distance threshold in pixels.
-
-    Returns:
-        bool: True if ball is within threshold distance from the wrist.
-    """
-    if wrist is None or ball_center is None:
-        return False
-
-    distance = calculate_distance(wrist, ball_center)
-    return distance < threshold
-
-def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
-                                  stored_release_angle, distance_threshold=150,
-                                  ball_was_near_wrist=False, Newscale=100,speed=None):
-    """
-    Detects release and returns updated release angle, state, and projectile points (if any).
-    """
-    if None in [wrist, ball_center]:
-        return stored_release_angle, ball_was_near_wrist, []
-
-    distance = calculate_distance(ball_center, wrist)
-    new_projectile = []
-
-    if (distance < 100 ):
-        ball_was_near_wrist = True
-
-    elif ball_was_near_wrist and  Newscale >= distance_threshold:
-        stored_release_angle = smoothed_angle
-        ball_was_near_wrist = False
-
-        if stored_release_angle is not None:
-            log_release_angle_to_json(stored_release_angle)
-            cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
-                        (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
-            
-            # ✅ Generate and return the arc points to store
-            # if wrist is not None:
-            #     start_pos = tuple(map(int, wrist))
-            #     new_projectile = generate_projectile_points(stored_release_angle,v=speed, start_pos=start_pos, scale=Newscale)
-
-    # Show distance always
-    cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",
-                (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
-
-    return stored_release_angle, ball_was_near_wrist     #, new_projectile
- 
-
-def average_initial_velocity(ball_positions):
-    """
-    Calculates the initial velocity (in m/s) using both x and y directions
-    from the last two tracked ball positions.
-    """
-    if ball_positions is None or len(ball_positions) < 2:
-        return None
-
-    (t1, (x1, y1), scale1), (t2, (x2, y2), scale2) = list(ball_positions)[-2:]
-
-    dt = t2 - t1
-    if dt <= 0:
-        return None
-
-    dx_px = x2 - x1
-    dy_px = y2 - y1
-    avg_scale = (scale1 + scale2) / 2
-
-    dx_m = dx_px / avg_scale
-    dy_m = dy_px / avg_scale
-
-    vx = dx_m / dt
-    vy = dy_m / dt
-    v = (vx ** 2 + vy ** 2) ** 0.5
-
-    # Log everything
-    log_release_angle_to_json(
-        release_angle=None,
-        speed=v,
-        ball_positions=[(t1, (x1, y1)), (t2, (x2, y2))],
-        px_per_m=avg_scale
-    )
-
-    return v
-
-
-def log_release_angle_to_json(release_angle=None, speed=None, ball_positions=None, px_per_m=None, filename="release_spped_time.json"):
-    """
-    Logs release angle, speed, ball positions, and px_per_m into a JSON file.
-    """
-    data = []
-
-    try:
-        with open(filename, "r") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
-    entry = {
-        "timestamp": datetime.now().isoformat()
-    }
-
-    if release_angle is not None:
-        entry["release_angle"] = round(release_angle, 2)
-
-    if speed is not None:
-        entry["release_speed_mps"] = round(speed, 3)
-
-    if ball_positions is not None:
-        entry["ball_positions"] = [
-            {
-                "time": t,
-                "x": int(xy[0]),
-                "y": int(xy[1])
-            } for t, xy in ball_positions
-        ]
-
-    if px_per_m is not None:
-        entry["px_per_m"] = round(px_per_m, 2)
-
-    data.append(entry)
-
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=4)
-
-def log_release_speed_to_json(speed, filename="release_speeds.json"):
-    data = []
-
-    # Try loading existing data
-    try:
-        with open(filename, "r") as f:
-            data = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass  # File doesn't exist or is malformed
-
-    # Append new entry
-    data.append({
-        "timestamp": datetime.now().isoformat(),
-        "average_release_speed_mps": round(speed, 3)
-    })
-
-    # Save to file
-    with open(filename, "w") as f:
-        json.dump(data, f, indent=4)
-
-
-
-def is_valid_shooting_pose(angle): # have to fix the angle
-    """
-    Determines whether the user's pose is correct and the basketball is in frame.
-
-    Args:
-        angle (float): Arm angle.
-        leg_angle (float): Leg angle.
-        image (ndarray): Current video frame.
-        wrist_point (tuple or list): (x, y) coordinates of the wrist.
-
-    Returns:
-        bool: True if pose is valid and ball is visible, False otherwise.
-    """
-    arm_ok = 0 <= angle <= 10
-    
-    #ball_ok = ballDetected
-
-    return arm_ok
-
-
 def get_box_center(x1, y1, x2, y2):
     """
     Returns the center (cx, cy) of a bounding box.
@@ -314,7 +81,7 @@ def get_box_center(x1, y1, x2, y2):
     cx = x1 + (x2 - x1) // 2
     cy = y1 + (y2 - y1) // 2
     return (cx, cy)
-
+#################### MODEL AND Scaling #####
 def detect_and_track_basketball(image, force_redetect=False):
     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
 
@@ -393,6 +160,154 @@ def determine_dynamic_scale(x1, x2,real_diameter_m=0.24):
         return None  # Avoid division by zero
     return pixel_diameter / (real_diameter_m )
 
+###############Shooting Mechanics##########################
+
+def is_ball_near_wrist(wrist, ball_center, threshold=100):
+    """
+    Returns True if the ball is within a certain pixel distance of the wrist.
+
+    Args:
+        wrist (tuple): (x, y) coordinates of the wrist.
+        ball_center (tuple): (x, y) coordinates of the basketball.
+        threshold (int): Distance threshold in pixels.
+
+    Returns:
+        bool: True if ball is within threshold distance from the wrist.
+    """
+    if wrist is None or ball_center is None:
+        return False
+
+    distance = calculate_distance(wrist, ball_center)
+    return distance < threshold
+
+def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
+                                  stored_release_angle, distance_threshold=150,
+                                  ball_was_near_wrist=False, Newscale=100,speed=None):
+    """
+    Detects release and returns updated release angle, state, and projectile points (if any).
+    """
+    if None in [wrist, ball_center]:
+        return stored_release_angle, ball_was_near_wrist, []
+
+    distance = calculate_distance(ball_center, wrist)
+    new_projectile = []
+
+    if (distance < 100 ):
+        ball_was_near_wrist = True
+
+    elif ball_was_near_wrist and  Newscale >= distance_threshold:
+        stored_release_angle = smoothed_angle
+        ball_was_near_wrist = False
+
+        if stored_release_angle is not None:
+            log_release_angle_to_json(stored_release_angle)
+            cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
+                        (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+            
+            # Generate and return the arc points to store
+            # if wrist is not None:
+            #     start_pos = tuple(map(int, wrist))
+            #     new_projectile = generate_projectile_points(stored_release_angle,v=speed, start_pos=start_pos, scale=Newscale)
+
+    # Show distance always
+    cv2.putText(frame, f"Ball-Wrist Dist: {int(distance)} px",
+                (50, 250), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
+
+    return stored_release_angle, ball_was_near_wrist     #, new_projectile
+ 
+def is_valid_shooting_pose(angle): # have to fix the angle
+    """
+    Determines whether the user's pose is correct and the basketball is in frame.
+
+    Args:
+        angle (float): Arm angle.
+        leg_angle (float): Leg angle.
+        image (ndarray): Current video frame.
+        wrist_point (tuple or list): (x, y) coordinates of the wrist.
+
+    Returns:
+        bool: True if pose is valid and ball is visible, False otherwise.
+    """
+    arm_ok = 0 <= angle <= 10
+    
+    #ball_ok = ballDetected
+
+    return arm_ok
+
+
+#################### Projectile##############################
+
+def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, start_pos=(100, 400)):
+   
+
+    angle_rad = np.radians(release_angle_deg)
+    t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
+    points = []
+
+    for t in t_vals:
+        x = v * np.cos(angle_rad) * t
+        y = v * np.sin(angle_rad) * t - 0.5 * g * t**2
+        x_px = int(start_pos[0] + x * scale)
+        y_px = int(start_pos[1] - y * scale)
+        points.append((x_px, y_px))
+
+    # Log angle, velocity, and scale
+    log_data = {
+        "launch_angle_deg": round(release_angle_deg, 2),
+        "velocity_mps": round(v, 2),
+        "scale_px_per_m": round(scale, 2)
+    }
+
+    filename = "generate_projectile_points_log.json"
+    existing_logs = []
+
+    try:
+        with open(filename, "r") as f:
+            existing_logs = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    existing_logs.append(log_data)
+
+    with open(filename, "w") as f:
+        json.dump(existing_logs, f, indent=4)
+
+    return points
+
+def average_initial_velocity(ball_positions):
+    """
+    Calculates the initial velocity (in m/s) using both x and y directions
+    from the last two tracked ball positions.
+    """
+    if ball_positions is None or len(ball_positions) < 2:
+        return None
+
+    (t1, (x1, y1), scale1), (t2, (x2, y2), scale2) = list(ball_positions)[-2:]
+
+    dt = t2 - t1
+    if dt <= 0:
+        return None
+
+    dx_px = x2 - x1
+    dy_px = y2 - y1
+    avg_scale = (scale1 + scale2) / 2
+
+    dx_m = dx_px / avg_scale
+    dy_m = dy_px / avg_scale
+
+    vx = dx_m / dt
+    vy = dy_m / dt
+    v = (vx ** 2 + vy ** 2) ** 0.5
+
+    # Log everything
+    log_release_angle_to_json(
+        release_angle=None,
+        speed=v,
+        ball_positions=[(t1, (x1, y1)), (t2, (x2, y2))],
+        px_per_m=avg_scale
+    )
+
+    return v
 
 
 def velocity_consumer():
@@ -412,10 +327,91 @@ def velocity_consumer():
                 avg_vel = average_initial_velocity(ball_position_buffer)
                 if avg_vel is not None:
                     with speed_lock:
-                        latest_speed = avg_vel  # ✅ Safely update global speed
+                        latest_speed = avg_vel  
         except Empty:
             continue
 
+
+################################LOGGER###################################
+def log_release_angle_to_json(release_angle, filename="release_angles.json"):
+    data = []
+
+    # Try loading existing data
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # File doesn't exist yet or is empty
+
+    # Add new release
+    data.append({
+        "timestamp": datetime.now().isoformat(),
+        "release_angle": round(release_angle, 2)
+    })
+
+    # Write updated list back to file
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+def log_release_angle_to_json(release_angle=None, speed=None, ball_positions=None, px_per_m=None, filename="release_spped_time.json"):
+    """
+    Logs release angle, speed, ball positions, and px_per_m into a JSON file.
+    """
+    data = []
+
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+
+    entry = {
+        "timestamp": datetime.now().isoformat()
+    }
+
+    if release_angle is not None:
+        entry["release_angle"] = round(release_angle, 2)
+
+    if speed is not None:
+        entry["release_speed_mps"] = round(speed, 3)
+
+    if ball_positions is not None:
+        entry["ball_positions"] = [
+            {
+                "time": t,
+                "x": int(xy[0]),
+                "y": int(xy[1])
+            } for t, xy in ball_positions
+        ]
+
+    if px_per_m is not None:
+        entry["px_per_m"] = round(px_per_m, 2)
+
+    data.append(entry)
+
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+
+def log_release_speed_to_json(speed, filename="release_speeds.json"):
+    data = []
+
+    # Try loading existing data
+    try:
+        with open(filename, "r") as f:
+            data = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass  # File doesn't exist or is malformed
+
+    # Append new entry
+    data.append({
+        "timestamp": datetime.now().isoformat(),
+        "average_release_speed_mps": round(speed, 3)
+    })
+
+    # Save to file
+    with open(filename, "w") as f:
+        json.dump(data, f, indent=4)
+##############################################################################
 
 
 
@@ -439,7 +435,7 @@ def process_video():
     #"C:/Users/antho/Downloads/20250325_102838.mp4"
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
-    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0526.MOV")
+    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0523.MOV")
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
         print("❌ Error: Could not access webcam.")
