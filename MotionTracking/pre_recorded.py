@@ -1,3 +1,6 @@
+
+#### imports
+
 from collections import deque
 from scipy.signal import savgol_filter
 from ultralytics import YOLO
@@ -5,6 +8,7 @@ from datetime import datetime
 from queue import Queue, Empty
 from threading import Lock
 
+###### Imports############
 import cv2
 import numpy as np
 import mediapipe as mp
@@ -162,24 +166,6 @@ def determine_dynamic_scale(x1, x2,real_diameter_m=0.24):
 
 ###############Shooting Mechanics##########################
 
-def is_ball_near_wrist(wrist, ball_center, threshold=100):
-    """
-    Returns True if the ball is within a certain pixel distance of the wrist.
-
-    Args:
-        wrist (tuple): (x, y) coordinates of the wrist.
-        ball_center (tuple): (x, y) coordinates of the basketball.
-        threshold (int): Distance threshold in pixels.
-
-    Returns:
-        bool: True if ball is within threshold distance from the wrist.
-    """
-    if wrist is None or ball_center is None:
-        return False
-
-    distance = calculate_distance(wrist, ball_center)
-    return distance < threshold
-
 def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
                                   stored_release_angle, distance_threshold=150,
                                   ball_was_near_wrist=False, Newscale=100,speed=None):
@@ -189,13 +175,12 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
     if None in [wrist, ball_center]:
         return stored_release_angle, ball_was_near_wrist, []
 
-    distance = calculate_distance(ball_center, wrist)
-    new_projectile = []
+    distance = calculate_distance(ball_center, wrist) / Newscale
 
-    if (distance < 100 ):
+    if (distance < distance_threshold ):
         ball_was_near_wrist = True
 
-    elif ball_was_near_wrist and  Newscale >= distance_threshold:
+    elif ball_was_near_wrist:
         stored_release_angle = smoothed_angle
         ball_was_near_wrist = False
 
@@ -579,7 +564,7 @@ def process_video():
 
                        stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
     frame, smoothed_angle, wrist, ball_center,
-    stored_release_angle, distance_threshold=150,
+    stored_release_angle, distance_threshold=0.3,
     ball_was_near_wrist=ball_was_near_wrist,Newscale=dynamic_scale,speed=current_speed)
                        
 
