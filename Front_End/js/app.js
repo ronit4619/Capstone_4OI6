@@ -270,3 +270,13 @@ function changePassword() {
 window.addEventListener("beforeunload", () => {
   stopCamera();
 });
+
+function navigateWithTransition(url) {
+  const overlay = document.querySelector('.transition-overlay');
+  overlay.style.transform = 'translateX(0)'; // Trigger the swipe effect
+
+  // Wait for the transition to complete before navigating
+  setTimeout(() => {
+    window.location.href = url;
+  }, 250); // Match the duration of the CSS transition
+}
