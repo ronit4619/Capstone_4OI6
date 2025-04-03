@@ -38,6 +38,8 @@ last_ball_box = None  # will store (x1, x2)
 
 latest_speed = None
 speed_lock = Lock()
+
+max_velocity = -1
 ############### SMALL FUNCTIONS#########################################
 def determine_facing_direction(landmarks, image_width):
     """
@@ -187,7 +189,7 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
         if stored_release_angle is not None:
             log_release_angle_to_json(stored_release_angle)
             cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
-                        (50, 290), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
+                        (50, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             
             # Generate and return the arc points to store
             # if wrist is not None:
@@ -401,8 +403,7 @@ def log_release_speed_to_json(speed, filename="release_speeds.json"):
 
 
 def process_video():
-    
-
+    max_velocity = -1 #### have to reset somwhere
     projectile_points = []
     arm_choice = input("👉 Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
     if arm_choice not in ['left', 'right']:
@@ -503,7 +504,7 @@ def process_video():
                 ball_detected, ball_center,ball_box_x = detect_and_track_basketball(frame, force_redetect)
 
                 if ball_detected and ball_center and ball_box_x:
-                    last_ball_center = ball_center
+                    #last_ball_center = ball_center
                     last_ball_box = ball_box_x
                     x1, x2 = last_ball_box
                     dynamic_scale = determine_dynamic_scale(x1, x2)
@@ -513,12 +514,10 @@ def process_video():
                     
                     if (
                         ball_center[1] < shoulder[1] and  # Ball is above shoulder
-                        calculate_distance(ball_center, shoulder) * dynamic_scale >= 1 * dynamic_scale  # Ball is 0.3m away
+                        calculate_distance(ball_center, shoulder) /dynamic_scale >= 0.3 # Ball is 0.3m away
                     ):
                         frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))  # Get current frame number
                         video_time = frame_idx / (fps+1)                       # Calculate true video time (in seconds)
-
-                        current_time = time.time()
                         #ball_position_buffer.append((video_time, ball_center))
                         ball_queue.put((video_time, ball_center,dynamic_scale)) # multi thread
                         #frame[:] = (0, 255, 0)  # Fill screen with green
@@ -547,19 +546,19 @@ def process_video():
                             f.write(json.dumps(entry) + "\n")
 
 
-                    cv2.putText(frame, "🎯 Basketball Detected!", (50, 200),
+                    cv2.putText(frame, "Basketball Detected!", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
-                     # ✅ Display scale on screen
+                     
                     cv2.putText(frame, f"Scale: {dynamic_scale:.2f} px/m", (50, 230),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
                    
 
                     if is_valid_shooting_pose :
                        # just call the function
-                       position = (50, 180)
+                       position = (50, 350)
                        cv2.putText(frame, "valid pose", position, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
 
                        with speed_lock:
-                        current_speed = latest_speed  # ✅ Safely read the most recent speed
+                        current_speed = latest_speed  #
 
 
                        stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
@@ -570,23 +569,37 @@ def process_video():
 
 
                        if stored_release_angle is not None:
+                        start_pos = tuple(map(int, wrist))
                         with speed_lock:
                             current_speed = latest_speed
 
                         if current_speed is not None:
-                            start_pos = tuple(map(int, wrist))  # or use shoulder if more stable
-                            projectile_points = generate_projectile_points(
-                                stored_release_angle,
-                                v=current_speed,
-                                start_pos=start_pos,
-                                scale=dynamic_scale
-                            )
+                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and  ball_center[1] > shoulder[1]:
+                                max_velocity = -1 # reset
+                            if max_velocity <= current_speed:
+                                max_velocity = current_speed
+                                
+                                projectile_points = generate_projectile_points(
+                                    stored_release_angle,
+                                    v=max_velocity,
+                                    start_pos=start_pos,
+                                    scale=dynamic_scale
+                                )
+                            cv2.putText(
+                                    frame,
+                                    f"Max Speed: {max_velocity:.2f} m/s",
+                                    (50, 400),  # 35px lower than the "valid pose" label
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6,
+                                    (0, 255, 255),  # yellow color
+                                    2
+                                )
                        
                     for (x, y) in projectile_points:
                         if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
 
                 elif not tracking_ball:
-                    cv2.putText(frame, "👋 Press 'R' to detect basketball", (50, 200),
+                    cv2.putText(frame, "Press 'R' to detect basketball", (50, 200),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
 
                 cv2.putText(frame, f"{arm_choice.title()} Elbow Angle: {int(elbow_angle)}°", (50, 50),
@@ -597,7 +610,7 @@ def process_video():
                     cv2.putText(frame, f"Stored Release Angle: {int(stored_release_angle)}°", (50, 150),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             else:
-                cv2.putText(frame, "🕵️ Waiting for pose detection...", (50, 50),
+                cv2.putText(frame, "Waiting for pose detection...", (50, 50),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
 
             cv2.putText(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30),
@@ -620,9 +633,9 @@ def process_video():
 
 
 if torch.cuda.is_available():
-    print(f"🚀 GPU is available: {torch.cuda.get_device_name(0)}")
+    print(f"GPU is available: {torch.cuda.get_device_name(0)}")
 else:
-    print("⚠️ GPU not available. Running on CPU.")
+    print("GPU not available. Running on CPU.")
 
 
 # Start the consumer thread BEFORE processing video
