@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Select Basketball Drill</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- Transition overlay for page swipe effect -->
+  <div class="transition-overlay"></div>
+
+  <!-- Floating background -->
+  <div class="basketball-bg" style="top: 10%; left: 5%">🏀</div>
+  <div class="basketball-bg" style="top: 30%; right: 15%">🏀</div>
+  <div class="basketball-bg" style="bottom: 20%; left: 20%">🏀</div>
+  <div class="basketball-bg" style="bottom: 5%; left: 40%">🏀</div> 
+  <div class="basketball-bg" style="bottom: 15%; right: 5%">🏀</div> 
+
+  <!-- Header -->
+  <div class="header-bar">
+    <div class="header-left">
+      <img src="images/cpBall_logo.jpg" alt="CP Ball Logo" class="logo" />
+    </div>
+    <div class="header-center">
+      <h2>Select Basketball Drill 📤</h2>
+    </div>
+    <div class="header-right">
+      <button class="back-button" onclick="navigateWithTransition('index.html')">← Dashboard</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="content-wrapper shared-content">
+    <!-- Buttons -->
+    <div class="button-container">
+      <button class="action-button" onclick="navigateWithTransition('index.html')">
+        <img src="images/shot-release.png" alt="Shot Release Angle" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Shot Release Angle</div>
+          <span class="button-description">Track your best shot release angle, speed, and trajectory</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('index.html')">
+        <img src="images/shot-pose.png" alt="Shot Pose" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Shot Pose</div>
+          <span class="button-description">Analyze shooting posture per arm and leg angles and detect the basketball</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('index.html')">
+        <img src="images/dribble-counter.png" alt="Dribble Counter" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Dribble Counter</div>
+          <span class="button-description">Keep track of how many times you can dribble in a set amount of time</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('index.html')">
+        <img src="images/shot-counter.png" alt="Shot Counter" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Shot Counter</div>
+          <span class="button-description">Find your shot accuracy by tracking shots made/missed</span>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>

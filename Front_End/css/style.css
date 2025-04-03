@@ -59,18 +59,13 @@
   
   button {
     padding: 12px;
+    color: #ffffff;
     background: #ff6b35;
-    color: white;
     border: none;
-    border-radius: 8px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 16px;
     transition: background 0.3s, transform 0.2s;
-  }
-  
-  button:hover {
-    background: #ff5722;
-    transform: translateY(-2px);
   }
   
   /* -------------- Privacy Policy -------------- */
@@ -412,4 +407,172 @@
   .user-dropdown:hover .dropdown-content {
     display: block;
   }
+
+.action-button {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 90%; /* Increased width */
+  min-height: 150px;
+  background: #f3f3f3;
+  padding: 15px; /* Adjust padding for better appearance */
+  text-align: left;
+  border-radius: 15px;
+  position: relative;
+  gap: 20px; /* Increased space between image and text */
+  border: 4px solid rgb(255, 255, 255); /* Outer border */
+  box-shadow: inset 0 0 0 2px #ff6b35; /* Inner border with spacing */
+  transition: background 0.3s, transform 0.2s;
+}
+
+.action-button:hover {
+  background: #e3e3e3;
+  transform: translateY(-2px);
+}
+
+.button-image {
+  width: 80px; /* Increased size */
+  height: 80px; /* Increased size */
+  object-fit: contain;
+  border-radius: 8px; /* Optional: round the image */
+}
+
+.button-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px; /* Space between title and description */
+  padding-left: 10px; /* Shift text to the right */
+}
+
+.button-title {
+  font-size: 20px; /* Slightly larger font size */
+  font-weight: bold;
+  color: #ff6b35;
+}
+
+.button-description {
+  font-size: 16px; /* Slightly larger font size */
+  color: #666;
+}
+
+/* Add or modify the following CSS */
+
+.button-container {
+  display: flex;
+  flex-direction: column; /* Default: stack buttons vertically */
+  align-items: center;
+  gap: 20px; /* Add spacing between buttons */
+  width: 90%; /* Adjust width for responsiveness */
+  padding-bottom: 20px; /* Add padding to the bottom */
+  margin: 0 auto; /* Center the container */
+}
+
+@media (min-width: 1020px) { /* For screens wider than 768px */
+  .button-container {
+    display: grid; /* Switch to grid layout */
+    grid-template-columns: repeat(2, 1fr); /* 2 columns of equal width */
+    gap: 20px; /* Add spacing between buttons */
+    width: 80%; /* Adjust width for larger screens */
+  }
+
+  .action-button {
+    min-width: 500px; /* Make buttons fill the grid column */
+    height: 300px; /* Set a fixed height for all buttons */
+  }
+}
+
+@media (min-width: 768px) { /* For screens wider than 768px */
+  .button-container {
+    display: grid; /* Switch to grid layout */
+    grid-template-columns: repeat(2, 1fr); /* 2 columns of equal width */
+    gap: 20px; /* Add spacing between buttons */
+    justify-content: center; /* Center the grid items horizontally */
+    width: auto; /* Let the grid adjust its width automatically */
+  }
+
+  .action-button {
+    width: 400px; /* Set a fixed width for buttons */
+    height: 300px; /* Set a fixed height for all buttons */
+  }
+
+  .button-title {
+    font-size: 24px; /* Increase font size for the title */
+  }
+
+  .button-description {
+    font-size: 18px; /* Increase font size for the description */
+  }
+}
+
+@media (min-width: 1020px) { /* For screens wider than 1020px */
+  .button-container {
+    display: grid; /* Switch to grid layout */
+    grid-template-columns: repeat(2, 1fr); /* 2 columns of equal width */
+    gap: 20px; /* Add spacing between buttons */
+    justify-content: center; /* Center the grid items horizontally */
+    align-items: center; /* Center the grid items vertically */
+    width: 100%; /* Ensure the container spans the full width */
+    max-width: 1200px; /* Limit the maximum width for better centering */
+    margin: 0 auto; /* Center the container within the page */
+  }
+
+  .action-button {
+    width: 500px; /* Set a fixed width for buttons */
+    height: 300px; /* Set a fixed height for all buttons */
+  }
+
+  .button-title {
+    font-size: 28px; /* Further increase font size for the title */
+  }
+
+  .button-description {
+    font-size: 20px; /* Further increase font size for the description */
+  }
+}
+
+@media (min-width: 1020px) { /* For screens wider than 768px */
+  .button-container {
+    display: grid; /* Switch to grid layout */
+    grid-template-columns: repeat(2, 1fr); /* 2 columns of equal width */
+    gap: 20px; /* Add spacing between buttons */
+    justify-content: center; /* Center the grid items horizontally */
+    align-items: center; /* Center the grid items vertically */
+    width: 100%; /* Ensure the container spans the full width */
+    max-width: 1200px; /* Limit the maximum width for better centering */
+    margin: 0 auto; /* Center the container within the page */
+  }
+
+  .action-button {
+    width: 500px; /* Set a fixed width for buttons */
+    height: 300px; /* Set a fixed height for all buttons */
+  }
+}
+
+.action-button {
+  width: 80%; /* Adjust width as needed */
+  min-height: 150px;
+  background: #ffffff;
+  padding: 10px 20px; /* Adjust padding for better appearance */
+  text-align: center;
+  border-radius: 15px; /* Make the button less round */
+  position: relative;
   
+}
+
+button:hover {
+  background: #e3e3e3;
+  transform: translateY(-2px);
+}
+
+/* Transition overlay for page swipe effect */
+.transition-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: #ff6b35; /* Adjust color to match your theme */
+  z-index: 9999;
+  transform: translateX(-100%);
+  transition: transform 0.25s ease-in-out;
+}
