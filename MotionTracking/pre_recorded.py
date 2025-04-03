@@ -36,6 +36,7 @@ recheck_interval = 0.1  # seconds #steph curry release is 0.4
 last_ball_center = None
 last_ball_box = None  # will store (x1, x2)
 
+latest_release_ball_angle = None
 latest_speed = None
 speed_lock = Lock()
 
@@ -147,48 +148,105 @@ def get_box_center(x1, y1, x2, y2):
 
 #     return False, None, None  # when no detection
 
+# def detect_and_track_basketball(image, force_redetect=False):
+#     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
+
+#     current_time = time.time()
+#     last_yolo_check_time = current_time
+
+#     best_ball_conf = 0
+#     best_rim_conf = 0
+#     basketball_box = None
+#     basketball_cx_cy = None
+#     rim_box = None
+
+#     if force_redetect:
+#         tracking_ball = False
+#         tracker = None
+#         print("🔄 Manual reset: Forcing re-detection.")
+
+#     if tracking_ball and (current_time - last_yolo_check_time > recheck_interval):
+#         print("🔁 Performing periodic YOLO confirmation.")
+#         tracking_ball = False
+#         tracker = None
+
+#     if tracking_ball and tracker is not None:
+#         success, box = tracker.update(image)
+#         if success:
+#             lost_tracker_frames = 0
+#             x, y, w, h = map(int, box)
+#             cx, cy = get_box_center(x, y, x + w, y + h)
+#             cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+#             cv2.putText(image, "Tracking", (x, y - 10),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+#             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
+#             return True, (cx, cy), (x, x + w), rim_box
+#         else:
+#             lost_tracker_frames += 1
+#             if lost_tracker_frames >= tracker_lost_threshold:
+#                 print("🛑 Tracker lost the ball. Switching to re-detection.")
+#                 tracking_ball = False
+#                 tracker = None
+
+#     # Run YOLO detection
+#     results = model(image)
+
+#     for result in results:
+#         for box in result.boxes:
+#             class_id = int(box.cls[0])
+#             confidence = float(box.conf[0])
+#             x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+#             if class_id == 0 and confidence > best_ball_conf:
+#                 best_ball_conf = confidence
+#                 w, h = x2 - x1, y2 - y1
+#                 tracker = cv2.TrackerCSRT_create()
+#                 tracker.init(image, (x1, y1, w, h))
+#                 tracking_ball = True
+#                 lost_tracker_frames = 0
+#                 cx, cy = get_box_center(x1, y1, x2, y2)
+#                 basketball_box = (x1, x2)
+#                 basketball_cx_cy = (cx, cy)
+
+#                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#                 label = f"basketball: {confidence:.2f}"
+#                 cv2.putText(image, label, (x1, y1 - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
+
+#             elif class_id == 1 and confidence > best_rim_conf:
+#                 best_rim_conf = confidence
+#                 rim_box = (x1, y1, x2, y2)
+#                 cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 255), 2)
+#                 cv2.putText(image, f"rim: {confidence:.2f}", (x1, y1 - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+
+#     if basketball_cx_cy:
+#         return True, basketball_cx_cy, basketball_box, rim_box
+#     else:
+#         return False, None, None, rim_box
+
+
 def detect_and_track_basketball(image, force_redetect=False):
-    global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
+    global last_yolo_check_time
 
     current_time = time.time()
-    rim_box = None  # 🏀 Rim box to return
+   
 
-    if force_redetect:
-        tracking_ball = False
-        tracker = None
-        print("🔄 Manual reset: Forcing re-detection.")
+    run_yolo = force_redetect or (current_time - last_yolo_check_time > recheck_interval)
+    
+    if not run_yolo:
+        return False, None, None, None
 
-    # Periodic YOLO re-check every recheck_interval seconds
-    if tracking_ball and (current_time - last_yolo_check_time > recheck_interval):
-        print("🔁 Performing periodic YOLO confirmation.")
-        tracking_ball = False
-        tracker = None
-
-    # If currently tracking, try updating with tracker
-    if tracking_ball and tracker is not None:
-        success, box = tracker.update(image)
-        if success:
-            lost_tracker_frames = 0
-            x, y, w, h = map(int, box)
-            cx, cy = get_box_center(x, y, x + w, y + h)
-            cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
-            cv2.putText(image, "Tracking", (x, y - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-            cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
-            return True, (cx, cy), (x, x + w), rim_box  # 🏀 also returning rim_box
-        else:
-            lost_tracker_frames += 1
-            if lost_tracker_frames >= tracker_lost_threshold:
-                print("🛑 Tracker lost the ball. Switching to re-detection.")
-                tracking_ball = False
-                tracker = None
-
-    # YOLO re-detection for both ball and rim
-    results = model(image)
     last_yolo_check_time = current_time
 
+    best_ball_conf = 0
+    best_rim_conf = 0
     basketball_box = None
     basketball_cx_cy = None
+    rim_box = None
+
+    results = model(image)
 
     for result in results:
         for box in result.boxes:
@@ -196,13 +254,8 @@ def detect_and_track_basketball(image, force_redetect=False):
             confidence = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
 
-            # Basketball detection (class_id == 0)
-            if class_id == 0 and confidence > 0.70 and basketball_box is None:
-                w, h = x2 - x1, y2 - y1
-                tracker = cv2.TrackerCSRT_create()
-                tracker.init(image, (x1, y1, w, h))
-                tracking_ball = True
-                lost_tracker_frames = 0
+            if class_id == 0 and confidence > best_ball_conf:
+                best_ball_conf = confidence
                 cx, cy = get_box_center(x1, y1, x2, y2)
                 basketball_box = (x1, x2)
                 basketball_cx_cy = (cx, cy)
@@ -213,22 +266,21 @@ def detect_and_track_basketball(image, force_redetect=False):
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
 
-            # Rim detection (class_id == 1)
-            elif class_id == 1 and confidence > 0.60 and rim_box is None:
-                rim_box = (x1, y1, x2, y2) # top left and top right
+            elif class_id == 1 and confidence > best_rim_conf:
+                best_rim_conf = confidence
+                rim_box = (x1, y1, x2, y2)
                 cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 255), 2)
                 cv2.putText(image, f"rim: {confidence:.2f}", (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
 
-    # Return values
     if basketball_cx_cy:
         return True, basketball_cx_cy, basketball_box, rim_box
     else:
-        return False, None, None, rim_box  # Still return rim even if ball not found
+        return False, None, None, rim_box
 
 
 
-def determine_dynamic_scale(x1, x2,real_diameter_m=0.24):
+def determine_dynamic_scale(x1, x2,real_diameter_m=0.25):
     """
     Calculates pixels-per-meter scale using basketball diameter.
 
@@ -367,6 +419,8 @@ def average_initial_velocity(ball_positions):
 
     vx = dx_m / dt
     vy = dy_m / dt
+
+    ball_angle =  np.degrees (np.arctan2(vy, vx))
     v = (vx ** 2 + vy ** 2) ** 0.5
 
     # Log everything
@@ -377,11 +431,19 @@ def average_initial_velocity(ball_positions):
         px_per_m=avg_scale
     )
 
-    return v
+    if ball_angle < 0:
+        ball_angle += 360
+
+# Then limit to the 0°–90° range if you only care about upward release angles
+    if ball_angle > 90:
+        ball_angle = 180 - ball_angle
+
+    return v, ball_angle
 
 
 def velocity_consumer():
     global latest_speed
+    global latest_release_ball_angle
     ball_position_buffer = []
 
     while True:
@@ -394,10 +456,11 @@ def velocity_consumer():
             ball_position_buffer.append((video_time, ball_center,dynamic_scale))
 
             if len(ball_position_buffer) >= 2:
-                avg_vel = average_initial_velocity(ball_position_buffer)
+                avg_vel,ball_angle = average_initial_velocity(ball_position_buffer)
                 if avg_vel is not None:
                     with speed_lock:
-                        latest_speed = avg_vel  
+                        latest_speed = avg_vel
+                        latest_release_ball_angle = ball_angle  
         except Empty:
             continue
 
@@ -655,16 +718,17 @@ def process_video():
                         start_pos = tuple(map(int, wrist))
                         with speed_lock:
                             current_speed = latest_speed
+                            current_angle = latest_release_ball_angle
 
                         if current_speed is not None:
                             if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and  ball_center[1] > shoulder[1]:
                                 max_velocity = -1 # reset
-                            if max_velocity <= current_speed:
-                                max_velocity = current_speed
                                 
+                            if max_velocity <= current_speed:
+                                max_velocity = current_speed                        
                                 projectile_points,make = generate_projectile_points(
-                                    stored_release_angle,
-                                    v=max_velocity,
+                                    current_angle,
+                                    v=current_speed,
                                     start_pos=start_pos,
                                     scale=dynamic_scale,rim=rim_box
                                 )
