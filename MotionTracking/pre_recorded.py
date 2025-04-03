@@ -88,10 +88,71 @@ def get_box_center(x1, y1, x2, y2):
     cy = y1 + (y2 - y1) // 2
     return (cx, cy)
 #################### MODEL AND Scaling #####
+# def detect_and_track_basketball(image, force_redetect=False):
+#     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
+
+#     current_time = time.time()
+#     if force_redetect:
+#         tracking_ball = False
+#         tracker = None
+#         print("🔄 Manual reset: Forcing re-detection.")
+
+#     # Periodic YOLO re-check every recheck_interval seconds
+#     if tracking_ball and (current_time - last_yolo_check_time > recheck_interval):
+#         print("🔁 Performing periodic YOLO confirmation.")
+#         tracking_ball = False
+#         tracker = None
+
+#     # If currently tracking, try updating with tracker
+#     if tracking_ball and tracker is not None:
+#         success, box = tracker.update(image)
+#         if success:
+#             lost_tracker_frames = 0
+#             x, y, w, h = map(int, box)
+#             cx, cy = get_box_center(x, y, x + w, y + h)
+#             cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+#             cv2.putText(image, "Tracking", (x, y - 10),
+#                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+#             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
+#             return True, (cx, cy), (x, x + w)  # 👈 include x1, x2
+#         else:
+#             lost_tracker_frames += 1
+#             if lost_tracker_frames >= tracker_lost_threshold:
+#                 print("🛑 Tracker lost the ball. Switching to re-detection.")
+#                 tracking_ball = False
+#                 tracker = None
+#             return False, None, None
+
+#     # If not tracking or re-detecting
+#     results = model(image)
+#     last_yolo_check_time = current_time
+#     for result in results:
+#         for box in result.boxes:
+#             class_id = int(box.cls[0])
+#             confidence = float(box.conf[0])
+#             if class_id == 0 and confidence > 0.70:
+#                 x1, y1, x2, y2 = map(int, box.xyxy[0])
+#                 w, h = x2 - x1, y2 - y1
+#                 tracker = cv2.TrackerCSRT_create()
+#                 tracker.init(image, (x1, y1, w, h))
+#                 tracking_ball = True
+#                 lost_tracker_frames = 0
+#                 cx, cy = get_box_center(x1, y1, x2, y2)
+#                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
+#                 label = f"basketball: {confidence:.2f}"
+#                 cv2.putText(image, label, (x1, y1 - 10),
+#                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
+#                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
+#                 return True, (cx, cy), (x1, x2)  # this is key
+
+#     return False, None, None  # when no detection
+
 def detect_and_track_basketball(image, force_redetect=False):
     global tracker, tracking_ball, lost_tracker_frames, last_yolo_check_time
 
     current_time = time.time()
+    rim_box = None  # 🏀 Rim box to return
+
     if force_redetect:
         tracking_ball = False
         tracker = None
@@ -114,38 +175,57 @@ def detect_and_track_basketball(image, force_redetect=False):
             cv2.putText(image, "Tracking", (x, y - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
             cv2.circle(image, (cx, cy), 5, (255, 0, 0), cv2.FILLED)
-            return True, (cx, cy), (x, x + w)  # 👈 include x1, x2
+            return True, (cx, cy), (x, x + w), rim_box  # 🏀 also returning rim_box
         else:
             lost_tracker_frames += 1
             if lost_tracker_frames >= tracker_lost_threshold:
                 print("🛑 Tracker lost the ball. Switching to re-detection.")
                 tracking_ball = False
                 tracker = None
-            return False, None, None
 
-    # If not tracking or re-detecting
+    # YOLO re-detection for both ball and rim
     results = model(image)
     last_yolo_check_time = current_time
+
+    basketball_box = None
+    basketball_cx_cy = None
+
     for result in results:
         for box in result.boxes:
             class_id = int(box.cls[0])
             confidence = float(box.conf[0])
-            if class_id == 0 and confidence > 0.70:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            # Basketball detection (class_id == 0)
+            if class_id == 0 and confidence > 0.70 and basketball_box is None:
                 w, h = x2 - x1, y2 - y1
                 tracker = cv2.TrackerCSRT_create()
                 tracker.init(image, (x1, y1, w, h))
                 tracking_ball = True
                 lost_tracker_frames = 0
                 cx, cy = get_box_center(x1, y1, x2, y2)
+                basketball_box = (x1, x2)
+                basketball_cx_cy = (cx, cy)
+
                 cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
                 label = f"basketball: {confidence:.2f}"
                 cv2.putText(image, label, (x1, y1 - 10),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 cv2.circle(image, (cx, cy), 5, (0, 255, 255), -1)
-                return True, (cx, cy), (x1, x2)  # 👈 this is key
 
-    return False, None, None  # when no detection
+            # Rim detection (class_id == 1)
+            elif class_id == 1 and confidence > 0.60 and rim_box is None:
+                rim_box = (x1, y1, x2, y2) # top left and top right
+                cv2.rectangle(image, (x1, y1), (x2, y2), (255, 0, 255), 2)
+                cv2.putText(image, f"rim: {confidence:.2f}", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 2)
+
+    # Return values
+    if basketball_cx_cy:
+        return True, basketball_cx_cy, basketball_box, rim_box
+    else:
+        return False, None, None, rim_box  # Still return rim even if ball not found
+
 
 
 def determine_dynamic_scale(x1, x2,real_diameter_m=0.24):
@@ -224,12 +304,18 @@ def is_valid_shooting_pose(angle): # have to fix the angle
 
 #################### Projectile##############################
 
-def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, start_pos=(100, 400)):
-   
+def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, start_pos=(100, 400), rim=None):
+    import numpy as np
+    import json
 
     angle_rad = np.radians(release_angle_deg)
     t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
     points = []
+    ball_made = False
+
+    # Parse rim if provided
+    if rim:
+        rim_left, rim_top, rim_right, rim_bottom = rim
 
     for t in t_vals:
         x = v * np.cos(angle_rad) * t
@@ -238,28 +324,25 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
         y_px = int(start_pos[1] - y * scale)
         points.append((x_px, y_px))
 
-    # Log angle, velocity, and scale
+        # Check if this point "goes in" the hoop
+        if rim:
+            if rim_left <= x_px <= rim_right and y_px <= rim_top:
+                ball_made = True
+
+    # Logging
     log_data = {
         "launch_angle_deg": round(release_angle_deg, 2),
         "velocity_mps": round(v, 2),
-        "scale_px_per_m": round(scale, 2)
+        "scale_px_per_m": round(scale, 2),
+        "ball_made": ball_made
     }
 
     filename = "generate_projectile_points_log.json"
-    existing_logs = []
-
-    try:
-        with open(filename, "r") as f:
-            existing_logs = json.load(f)
-    except (FileNotFoundError, json.JSONDecodeError):
-        pass
-
-    existing_logs.append(log_data)
-
     with open(filename, "w") as f:
-        json.dump(existing_logs, f, indent=4)
+        json.dump(log_data, f, indent=2)
 
-    return points
+    return points, ball_made
+
 
 def average_initial_velocity(ball_positions):
     """
@@ -501,7 +584,7 @@ def process_video():
                 #    smoothed_angle = 180 - smoothed_angle
 
                
-                ball_detected, ball_center,ball_box_x = detect_and_track_basketball(frame, force_redetect)
+                ball_detected, ball_center,ball_box_x,rim_box = detect_and_track_basketball(frame, force_redetect)
 
                 if ball_detected and ball_center and ball_box_x:
                     #last_ball_center = ball_center
@@ -579,11 +662,11 @@ def process_video():
                             if max_velocity <= current_speed:
                                 max_velocity = current_speed
                                 
-                                projectile_points = generate_projectile_points(
+                                projectile_points,make = generate_projectile_points(
                                     stored_release_angle,
                                     v=max_velocity,
                                     start_pos=start_pos,
-                                    scale=dynamic_scale
+                                    scale=dynamic_scale,rim=rim_box
                                 )
                             cv2.putText(
                                     frame,
@@ -594,6 +677,18 @@ def process_video():
                                     (0, 255, 255),  # yellow color
                                     2
                                 )
+                            if make == True:
+                                overlay = frame.copy()
+                                flash_color = (0, 255, 0)  # Bright green
+                                alpha = 0.4  # Transparency level
+
+                                # Draw a green transparent overlay
+                                cv2.rectangle(overlay, (0, 0), (frame.shape[1], frame.shape[0]), flash_color, -1)
+                                cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+                                cv2.putText(frame, "✅ Shot Made!", (50, 50),
+                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+
+
                        
                     for (x, y) in projectile_points:
                         if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
