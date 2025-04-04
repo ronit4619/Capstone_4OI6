@@ -319,7 +319,7 @@ def store_release_angle_if_valid(frame, smoothed_angle, wrist, ball_center,
         ball_was_near_wrist = False
 
         if stored_release_angle is not None:
-            log_release_angle_to_json(stored_release_angle)
+            #log_release_angle_to_json(stored_release_angle)
             cv2.putText(frame, f"Release Angle: {int(stored_release_angle)}°",
                         (50, 300), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 255), 1)
             
@@ -424,12 +424,12 @@ def average_initial_velocity(ball_positions):
     v = (vx ** 2 + vy ** 2) ** 0.5
 
     # Log everything
-    log_release_angle_to_json(
-        release_angle=None,
-        speed=v,
-        ball_positions=[(t1, (x1, y1)), (t2, (x2, y2))],
-        px_per_m=avg_scale
-    )
+    # log_release_angle_to_json(
+    #     release_angle=None,
+    #     speed=v,
+    #     ball_positions=[(t1, (x1, y1)), (t2, (x2, y2))],
+    #     px_per_m=avg_scale
+    # )
 
     if ball_angle < 0:
         ball_angle += 360
