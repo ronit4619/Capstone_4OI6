@@ -17,6 +17,7 @@ import torch
 import json
 import threading
 import numpy as np
+import tkinter as tk
 # Global Variable
 torch_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 mp_pose = mp.solutions.pose
@@ -556,7 +557,12 @@ def log_release_speed_to_json(speed, filename="release_speeds.json"):
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
 ##############################################################################
-
+def get_screen_resolution():
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    return screen_width, screen_height
 
 
 def process_video():
@@ -582,7 +588,7 @@ def process_video():
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
     #cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0524.MOV")
-    cap = cv2.VideoCapture()
+    cap = cv2.VideoCapture(1)
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
         print("Error: Could not access webcam.")
@@ -790,7 +796,14 @@ def process_video():
 
             cv2.putText(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            
+            screen_w, screen_h = get_screen_resolution()
 
+            # Optional: Leave room for taskbar/title bar, scale down a bit
+            target_w = int(screen_w * 0.9)
+            target_h = int(screen_h * 0.9)
+
+            frame = cv2.resize(frame, (target_w, target_h))
             cv2.imshow('Release Angle Detection', frame)
 
             if key == ord('q'):
