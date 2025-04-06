@@ -364,6 +364,8 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
     t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
     points = []
     ball_made = False
+    hit_above = False
+    hit_inside = False
 
     # Parse rim if provided
     if rim:
@@ -378,8 +380,17 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
 
         # Check if this point "goes in" the hoop
         if rim:
+            # 1️⃣ Point passed above rim (entry path)
             if rim_left <= x_px <= rim_right and y_px <= rim_top:
-                ball_made = True
+                hit_above = True
+
+            # 2️⃣ Point inside rim box
+            if rim_left <= x_px <= rim_right and rim_top <= y_px <= rim_bottom:
+                hit_inside = True
+
+        if rim and hit_above and hit_inside:
+            ball_made = True
+            
 
     # Logging
     # log_data = {
@@ -444,7 +455,7 @@ def average_initial_velocity(ball_positions):
 def velocity_consumer():
     global latest_speed
     global latest_release_ball_angle
-    ball_position_buffer = []
+    ball_position_buffer = deque(maxlen=60)
 
     while True:
         try:
@@ -571,7 +582,7 @@ def process_video():
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
     #cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0524.MOV")
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture()
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
         print("Error: Could not access webcam.")
