@@ -21,6 +21,11 @@
       0% { transform: rotate(0deg); }
       100% { transform: rotate(360deg); }
     }
+
+    #poseOptions {
+      margin-bottom: 1rem;
+      display: none;
+    }
   </style>
 </head>
 <body>
@@ -51,10 +56,20 @@
       <button onclick="stopAnalysis()" style="background-color: #dc3545; color: white;">Stop Analysis</button>
     </div>
 
+    <!-- Arm and Save Frame Options for Pose -->
+    <div id="poseOptions">
+      <label>Arm to Scan:</label>
+      <input type="radio" name="arm" value="right" checked> Right
+      <input type="radio" name="arm" value="left"> Left
+      <br /><br />
+      <label>Save Frames:</label>
+      <input type="checkbox" id="saveFramesCheckbox">
+    </div>
+
     <!-- Loader -->
     <div id="loader"></div>
 
-    <!-- Replaced iframe with img -->
+    <!-- Live stream image -->
     <img id="liveStreamImage" style="width: 720px; height: 540px; display: none;" />
   </div>
 
