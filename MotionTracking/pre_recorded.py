@@ -734,8 +734,11 @@ def process_video():
                             current_angle = latest_release_ball_angle
 
                         if current_speed is not None:
-                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and  ball_center[1] > shoulder[1]:
+                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and ball_center[1] > shoulder[1]:
                                 max_velocity = -1 # reset
+                                max_angle = current_angle
+                                if max_angle <0:
+                                    max_angle = 180 + max_angle
                                 
                             if max_velocity <= current_speed:
                                 max_velocity = current_speed                        
@@ -756,7 +759,7 @@ def process_video():
                                 )
                             cv2.putText(
                                     frame,
-                                    f"Actual Ball Release angle: {latest_release_ball_angle:.2f} deg",
+                                    f"Actual Ball Release angle: {max_angle:.2f} deg",
                                     (50, 450),  # 35px lower than the "valid pose" label
                                     cv2.FONT_HERSHEY_SIMPLEX,
                                     0.6,
