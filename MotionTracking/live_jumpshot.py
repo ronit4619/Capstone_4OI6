@@ -17,6 +17,7 @@ import torch
 import json
 import threading
 import numpy as np
+import tkinter as tk
 # Global Variable
 torch_device = 'cuda' if torch.cuda.is_available() else 'cpu'
 mp_pose = mp.solutions.pose
@@ -30,7 +31,7 @@ tracking_ball = False
 lost_tracker_frames = 0
 tracker_lost_threshold = 10
 last_yolo_check_time = 0
-recheck_interval = 0.1  # seconds #steph curry release is 0.4
+recheck_interval = 0.05  # seconds #steph curry release is 0.4
 
 ## global
 last_ball_center = None
@@ -41,6 +42,10 @@ latest_speed = None
 speed_lock = Lock()
 
 max_velocity = -1
+
+BASE_WIDTH = 4096 
+
+
 ############### SMALL FUNCTIONS#########################################
 def determine_facing_direction(landmarks, image_width):
     """
@@ -364,6 +369,8 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
     t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
     points = []
     ball_made = False
+    hit_above = False
+    hit_inside = False
 
     # Parse rim if provided
     if rim:
@@ -378,8 +385,17 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
 
         # Check if this point "goes in" the hoop
         if rim:
+            # 1️⃣ Point passed above rim (entry path)
             if rim_left <= x_px <= rim_right and y_px <= rim_top:
-                ball_made = True
+                hit_above = True
+
+            # 2️⃣ Point inside rim box
+            if rim_left <= x_px <= rim_right and rim_top <= y_px <= rim_bottom:
+                hit_inside = True
+
+        if rim and hit_above and hit_inside:
+            ball_made = True
+            
 
     # Logging
     # log_data = {
@@ -444,7 +460,7 @@ def average_initial_velocity(ball_positions):
 def velocity_consumer():
     global latest_speed
     global latest_release_ball_angle
-    ball_position_buffer = []
+    ball_position_buffer = deque(maxlen=60)
 
     while True:
         try:
@@ -545,32 +561,35 @@ def log_release_speed_to_json(speed, filename="release_speeds.json"):
     with open(filename, "w") as f:
         json.dump(data, f, indent=4)
 ##############################################################################
+def get_screen_resolution():
+    root = tk.Tk()
+    root.withdraw()  # Hide the root window
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+    return screen_width, screen_height
 
-
+def draw_scaled_text(frame, text, pos, font_scale_base, color, thickness_base, scale_factor):
+    font_scale = font_scale_base * scale_factor
+    thickness = max(1, int(thickness_base * scale_factor))
+    pos = (int(pos[0] * scale_factor), int(pos[1] * scale_factor))
+    cv2.putText(frame, text, pos, cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
 
 def process_video():
-
-
-    start_time = time.time() # added to grab real time
-    max_velocity = -1 #### have to reset somwhere
+    start_time = time.time()
+    max_velocity = -1
     projectile_points = []
-    arm_choice = input(" Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
+    
+    arm_choice = input("Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
     if arm_choice not in ['left', 'right']:
-        print(" Invalid choice. Please enter 'left' or 'right'.")
+        print("Invalid choice. Please enter 'left' or 'right'.")
         return
 
     SHOULDER = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_SHOULDER").value
     ELBOW = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_ELBOW").value
     WRIST = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_WRIST").value
-
     non_dominant = 'right' if arm_choice == 'left' else 'left'
     NON_DOM_SHOULDER = getattr(mp_pose.PoseLandmark, f"{non_dominant.upper()}_SHOULDER").value
-    
-    #cap = cv2.VideoCapture("")
-    #"C:/Users/antho/Downloads/20250325_102838.mp4"
-    #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
-    #cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0524.MOV")
     cap = cv2.VideoCapture(0)
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
@@ -581,19 +600,22 @@ def process_video():
     print("Press 'R' to re-detect basketball | 'Q' to quit")
     print(fps)
     stored_release_angle = None
-
-
     angle_buffer = deque(maxlen=7)
+
+    screen_w, screen_h = get_screen_resolution()
+    target_w = int(screen_w * 0.9)
+    target_h = int(screen_h * 0.9)
+    BASE_WIDTH = 3840
+
     with mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7) as pose:
-        # start global variable
-        #shooting_state = 'ready'
         ball_was_near_wrist = False
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 print("Error: Could not read frame.")
                 break
-
+            frame = cv2.resize(frame, (target_w, target_h))
+            scale_factor = frame.shape[1] / BASE_WIDTH
             frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             results = pose.process(frame_rgb)
 
@@ -602,19 +624,11 @@ def process_video():
 
             if results.pose_landmarks:
                 landmarks = results.pose_landmarks.landmark
-
-                ## added
-                # direction = determine_facing_direction(landmarks, frame.shape[1]) 
-                # cv2.putText(frame, f"Facing: {direction}", (50, 20),
-                # cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-
                 shoulder = [landmarks[SHOULDER].x * frame.shape[1], landmarks[SHOULDER].y * frame.shape[0]]
                 elbow = [landmarks[ELBOW].x * frame.shape[1], landmarks[ELBOW].y * frame.shape[0]]
                 wrist = [landmarks[WRIST].x * frame.shape[1], landmarks[WRIST].y * frame.shape[0]]
                 dominant_shoulder_z = landmarks[SHOULDER].z
                 non_dominant_shoulder_z = landmarks[NON_DOM_SHOULDER].z
-                
-
 
                 x_axis_start = (int(shoulder[0] - 100), int(shoulder[1]))
                 x_axis_end = (int(shoulder[0] + 150), int(shoulder[1]))
@@ -641,155 +655,105 @@ def process_video():
 
                 smoothed_angle = savgol_filter(list(angle_buffer), window_length=7, polyorder=3)[-1] \
                     if len(angle_buffer) == angle_buffer.maxlen else shoulder_elbow_angle
-                
-                # Compare z-coordinates
-                if dominant_shoulder_z > non_dominant_shoulder_z:
-                    smoothed_angle=180-smoothed_angle
-                
-                
-                #if direction == 'right':
-                #    smoothed_angle = 180 - smoothed_angle
 
-               
-                ball_detected, ball_center,ball_box_x,rim_box = detect_and_track_basketball(frame, force_redetect)
+                if dominant_shoulder_z > non_dominant_shoulder_z:
+                    smoothed_angle = 180 - smoothed_angle
+
+                ball_detected, ball_center, ball_box_x, rim_box = detect_and_track_basketball(frame, force_redetect)
 
                 if ball_detected and ball_center and ball_box_x:
-                    #last_ball_center = ball_center
                     last_ball_box = ball_box_x
                     x1, x2 = last_ball_box
                     dynamic_scale = determine_dynamic_scale(x1, x2)
 
-
-                    # recently added
-                    
                     if (
-                        ball_center[1] < shoulder[1] and  # Ball is above shoulder
-                        calculate_distance(ball_center, shoulder) /dynamic_scale >= 0.3 # Ball is 0.3m away
+                        ball_center[1] < shoulder[1] and
+                        calculate_distance(ball_center, shoulder) / dynamic_scale >= 0.3
                     ):
-                        frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))  # Get current frame number
-                        #video_time = frame_idx / (fps+1)                       # Calculate true video time (in seconds)
+                        frame_idx = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
                         video_time = time.time() - start_time
-                        #ball_position_buffer.append((video_time, ball_center))
-                        ball_queue.put((video_time, ball_center,dynamic_scale)) # multi thread
-                        #frame[:] = (0, 255, 0)  # Fill screen with green
-                        
+                        ball_queue.put((video_time, ball_center, dynamic_scale))
                         x, y = int(ball_center[0]), int(ball_center[1])
-                        size = 8  # size of the X arms
-                        color = (0, 255, 0)  # Green in BGR
-                        thickness = 2
+                        size = 8
+                        color = (0, 255, 0)
+                        cv2.line(frame, (x - size, y - size), (x + size, y + size), color, 2)
+                        cv2.line(frame, (x - size, y + size), (x + size, y - size), color, 2)
 
-                        cv2.line(frame, (x - size, y - size), (x + size, y + size), color, thickness)
-                        cv2.line(frame, (x - size, y + size), (x + size, y - size), color, thickness)
+                    draw_scaled_text(frame, "Basketball Detected!", (50, 200), 0.6, (0, 165, 255), 1.5, scale_factor)
+                    draw_scaled_text(frame, f"Scale: {dynamic_scale:.2f} px/m", (50, 230), 0.6, (255, 255, 0), 1.5, scale_factor)
 
-                        # Log entry
-                        # entry = {
-                        # "timestamp_sec": round(video_time, 4),
-                        # "frame_idx": frame_idx,
-                        # "x": int(ball_center[0]),
-                        # "y": int(ball_center[1]),
-                        # "dynamic scale":int(dynamic_scale)
-                        # }
+                    if is_valid_shooting_pose:
+                        draw_scaled_text(frame, "valid pose", (50, 350), 0.6, (0, 255, 0), 1.5, scale_factor)
 
-                       
-
-                        # Append to a file
-                        # with open("ball_position_log.json", "a") as f:
-                        #     f.write(json.dumps(entry) + "\n")
-
-
-                    cv2.putText(frame, "Basketball Detected!", (50, 200),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
-                     
-                    cv2.putText(frame, f"Scale: {dynamic_scale:.2f} px/m", (50, 230),cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
-                   
-
-                    if is_valid_shooting_pose :
-                       # just call the function
-                       position = (50, 350)
-                       cv2.putText(frame, "valid pose", position, cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-
-                       with speed_lock:
-                        current_speed = latest_speed  #
-
-
-                       stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
-    frame, smoothed_angle, wrist, ball_center,
-    stored_release_angle, distance_threshold=0.3,
-    ball_was_near_wrist=ball_was_near_wrist,Newscale=dynamic_scale,speed=current_speed)
-                       
-
-
-                       if stored_release_angle is not None:
-                        start_pos = tuple(map(int, wrist))
                         with speed_lock:
                             current_speed = latest_speed
-                            current_angle = latest_release_ball_angle
 
-                        if current_speed is not None:
-                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and  ball_center[1] > shoulder[1]:
-                                max_velocity = -1 # reset
-                                
-                            if max_velocity <= current_speed:
-                                max_velocity = current_speed                        
-                                projectile_points,make = generate_projectile_points(
-                                    current_angle,
-                                    v=current_speed,
-                                    start_pos=start_pos,
-                                    scale=dynamic_scale,rim=rim_box
-                                )
-                            cv2.putText(
-                                    frame,
-                                    f"Max Speed: {max_velocity:.2f} m/s",
-                                    (50, 400),  # 35px lower than the "valid pose" label
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.6,
-                                    (0, 255, 255),  # yellow color
-                                    2
-                                )
-                            if make == True:
-                                overlay = frame.copy()
-                                flash_color = (0, 255, 0)  # Bright green
-                                alpha = 0.4  # Transparency level
+                        stored_release_angle, ball_was_near_wrist = store_release_angle_if_valid(
+                            frame, smoothed_angle, wrist, ball_center,
+                            stored_release_angle, distance_threshold=0.3,
+                            ball_was_near_wrist=ball_was_near_wrist, Newscale=dynamic_scale, speed=current_speed)
 
-                                # Draw a green transparent overlay
-                                cv2.rectangle(overlay, (0, 0), (frame.shape[1], frame.shape[0]), flash_color, -1)
-                                cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-                                cv2.putText(frame, "Shot Made!", (50, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
+                        if stored_release_angle is not None:
+                            start_pos = tuple(map(int, wrist))
+                            with speed_lock:
+                                current_speed = latest_speed
+                                current_angle = latest_release_ball_angle
 
+                            if current_speed is not None:
+                                if (calculate_distance(wrist, ball_center) / dynamic_scale) < 0.1 and ball_center[1] > shoulder[1]:
+                                    max_velocity = -1
 
-                       
+                                if max_velocity <= current_speed:
+                                    max_velocity = current_speed
+                                    projectile_points, make = generate_projectile_points(
+                                        current_angle,
+                                        v=current_speed,
+                                        start_pos=start_pos,
+                                        scale=dynamic_scale,
+                                        rim=rim_box
+                                    )
+                                draw_scaled_text(frame, f"Max Speed: {max_velocity:.2f} m/s", (50, 400), 0.6, (0, 255, 255), 1.5, scale_factor)
+
+                                if make:
+                                    overlay = frame.copy()
+                                    flash_color = (0, 255, 0)
+                                    alpha = 0.4
+                                    cv2.rectangle(overlay, (0, 0), (frame.shape[1], frame.shape[0]), flash_color, -1)
+                                    cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+                                    draw_scaled_text(frame, "Shot Made!", (50, 50), 1.2, (255, 255, 255), 3, scale_factor)
+
                     for (x, y) in projectile_points:
-                        if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
+                        if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:
+                            cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
 
                 elif not tracking_ball:
-                    cv2.putText(frame, "Press 'R' to detect basketball", (50, 200),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    draw_scaled_text(frame, "Press 'R' to detect basketball", (50, 200), 1.0, (0, 0, 255), 2, scale_factor)
 
-                cv2.putText(frame, f"{arm_choice.title()} Elbow Angle: {int(elbow_angle)}°", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-                cv2.putText(frame, f"Smoothed Shoulder-Elbow Angle: {int(smoothed_angle)}°", (50, 100),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                draw_scaled_text(frame, f"{arm_choice.title()} Elbow Angle: {int(elbow_angle)}°", (50, 50), 1.0, (0, 255, 0), 2, scale_factor)
+                draw_scaled_text(frame, f"Smoothed Shoulder-Elbow Angle: {int(smoothed_angle)}°", (50, 100), 1.0, (255, 255, 0), 2, scale_factor)
+
                 if stored_release_angle is not None:
-                    cv2.putText(frame, f"Stored Release Angle: {int(stored_release_angle)}°", (50, 150),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                    draw_scaled_text(frame, f"Stored Release Angle: {int(stored_release_angle)}°", (50, 150), 1.0, (0, 0, 255), 2, scale_factor)
+
             else:
-                cv2.putText(frame, "Waiting for pose detection...", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                draw_scaled_text(frame, "Waiting for pose detection...", (50, 50), 0.8, (0, 0, 255), 2, scale_factor)
 
-            cv2.putText(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+            draw_scaled_text(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30), 0.6, (255, 255, 255), 1.2, scale_factor)
 
+            
             cv2.imshow('Release Angle Detection', frame)
 
             if key == ord('q'):
                 print("Exiting...")
                 break
 
-    ball_queue.put("STOP")  # Gracefully signal the thread to stop
-    consumer_thread.join()  # Wait for the thread to finish
+    ball_queue.put("STOP")
+    consumer_thread.join()
     cap.release()
     cv2.destroyAllWindows()
+
+
+
 
 
 
