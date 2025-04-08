@@ -23,10 +23,23 @@ def start_analysis():
 
     if analysis_type == "pose":
         print("Starting pose detection stream on http://localhost:8002/video")
-        current_process = subprocess.Popen(["python", "analyze_pose.py"])
-    elif analysis_type == "shot":
+        current_process = subprocess.Popen([
+            "python", "analyze_pose.py",
+            "--arm", data.get("arm", "default"),
+            "--save", str(data.get("save_frames", False))
+            ])
+    elif analysis_type == "shot-release":
         print("Starting shot tracking stream on http://localhost:8002/video")
-        current_process = subprocess.Popen(["python", "analyze_shot.py"])
+        current_process = subprocess.Popen([
+            "python", "analyze_shot_release.py",
+            "--arm", data.get("arm", "default"),
+            ])
+    elif analysis_type == "dribble-counter":
+        print("Starting dribble counter stream on http://localhost:8002/video")
+        current_process = subprocess.Popen([
+            "python", "analyze_dribble.py"
+            ])
+
     else:
         return jsonify({"status": "error", "message": "Invalid type"}), 400
 

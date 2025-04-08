@@ -3,14 +3,19 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Upload Session</title>
+  <title>Game Analysis</title>
   <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
+  <!-- Transition overlay for page swipe effect -->
+  <div class="transition-overlay"></div>
+
   <!-- Floating background -->
   <div class="basketball-bg" style="top: 10%; left: 5%">🏀</div>
   <div class="basketball-bg" style="top: 30%; right: 15%">🏀</div>
   <div class="basketball-bg" style="bottom: 20%; left: 20%">🏀</div>
+  <div class="basketball-bg" style="bottom: 5%; left: 40%">🏀</div> 
+  <div class="basketball-bg" style="bottom: 15%; right: 5%">🏀</div> 
 
   <!-- Header -->
   <div class="header-bar">
@@ -18,28 +23,46 @@
       <img src="images/cpBall_logo.jpg" alt="CP Ball Logo" class="logo" />
     </div>
     <div class="header-center">
-      <h2>Upload Session 📤</h2>
+      <h2>Game Analysis 📤</h2>
     </div>
     <div class="header-right">
-      <button class="back-button" onclick="window.location.href='index.html'">← Dashboard</button>
+      <button class="back-button" onclick="navigateWithTransition('index.html')">← Dashboard</button>
     </div>
   </div>
 
   <!-- Main content -->
   <div class="content-wrapper shared-content">
-    <div class="upload-container" onclick="document.getElementById('fileInput').click()">
-      <p>Click to upload basketball video</p>
-      <p>(MP4, AVI, MOV | Max 500MB)</p>
+    <!-- Buttons -->
+    <div class="button-container">
+      <button class="action-button" onclick="navigateWithTransition('jsbd.html')">
+        <img src="images/shot-release.png" alt="Jumpshot Break Down" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Jumpshot Break Down</div>
+          <span class="button-description">Break down your jump shot with insights on angle and trajectory</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('pose-detection.html')">
+        <img src="images/shot-pose.png" alt="Shot Pose" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Shot Pose</div>
+          <span class="button-description">Analyze shooting posture per arm and leg angles and detect the basketball</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('dribble-counter.html')">
+        <img src="images/dribble-counter.png" alt="Dribble Counter" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Dribble Counter</div>
+          <span class="button-description">Keep track of how many times you can dribble in a set amount of time</span>
+        </div>
+      </button>
+      <button class="action-button" onclick="navigateWithTransition('index.html')">
+        <img src="images/shot-counter.png" alt="Shot Counter" class="button-image" />
+        <div class="button-content">
+          <div class="button-title">Shot Counter</div>
+          <span class="button-description">Find your shot accuracy by tracking shots made/missed</span>
+        </div>
+      </button>
     </div>
-
-    <input type="file" id="fileInput" accept="video/*" hidden />
-
-    <div class="video-preview hidden" id="uploadPreview">
-      <video id="uploadedVideo" controls></video>
-    </div>
-
-    <button id="analyzeButton" class="hidden" onclick="analyzeVideo()">Analyze Video</button>
-    <div id="analysisResult" style="margin-top: 1rem; color: white; font-weight: bold;"></div>
   </div>
 
   <script src="js/app.js"></script>

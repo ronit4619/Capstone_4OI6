@@ -206,32 +206,56 @@ document.getElementById("fileInput").addEventListener("change", function (e) {
 function startAnalysis(type) {
   const loader = document.getElementById("loader");
   const videoImage = document.getElementById("liveStreamImage");
-
+  const poseOptions = document.getElementById("poseOptions");
+  const saveFramesCheckbox = document.getElementById("saveFramesCheckbox");
+  
+  if (type === "pose" || type === "shot-release") {
+    if (poseOptions) poseOptions.style.display = "block";
+    if (saveFramesCheckbox) saveFramesCheckbox.parentElement.style.display = type === "pose" ? "block" : "none";
+  } else {
+    if (poseOptions) poseOptions.style.display = "none";
+  }
+  
   loader.style.display = "block";
   videoImage.style.display = "none";
+
+  // Build request body
+  let body = { type };
+
+  // Arm selection applies to pose and shot-release
+  if (["pose", "shot-release"].includes(type)) {
+    const arm = document.querySelector('input[name="arm"]:checked').value;
+    body.arm = arm;
+  }
+
+  // Save frames only applies to pose
+  if (type === "pose") {
+    const saveFrames = document.getElementById("saveFramesCheckbox").checked;
+    body.save_frames = saveFrames;
+  }
 
   fetch(`${ANALYSIS_BACKEND_URL}/start-analysis`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ type: type }),
+    body: JSON.stringify(body)
   })
-    .then((res) => res.json())
-    .then((data) => {
+    .then(res => res.json())
+    .then(data => {
       if (data.status === "ok") {
         setTimeout(() => {
-          videoImage.src = "http://127.0.0.1:8002/video";
+          videoImage.src = "http://localhost:8002/video";
           videoImage.style.display = "block";
           loader.style.display = "none";
-        }, 5000);
+        }, 30000);
       } else {
         loader.style.display = "none";
         alert("Server error starting analysis.");
       }
     })
-    .catch((err) => {
+    .catch(err => {
       loader.style.display = "none";
+      alert("Error starting analysis.");
       console.error(err);
-      alert("Server error starting analysis.");
     });
 }
 
@@ -240,21 +264,17 @@ function stopAnalysis() {
   fetch(`${ANALYSIS_BACKEND_URL}/stop-analysis`, {
     method: "POST"
   })
-  .then((res) => res.json())
-  .then((data) => {
-    if (data.status === "ok") {
-      const frame = document.getElementById("liveStreamFrame");
-      frame.style.display = "none";  // Hide the iframe
-      frame.src = ""; // Clear the source to stop trying to reload
+    .then(res => res.json())
+    .then(data => {
+      const videoImage = document.getElementById("liveStreamImage");
+      const poseOptions = document.getElementById("poseOptions");
+
+      videoImage.src = "";
+      videoImage.style.display = "none";
+      poseOptions.style.display = "none";
+
       alert("Analysis stopped.");
-    } else {
-      alert("No analysis was running.");
-    }
-  })
-  .catch((err) => {
-    console.error(err);
-    alert("Failed to stop analysis.");
-  });
+    });
 }
 
 

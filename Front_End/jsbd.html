@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jumpshot Analysis</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    #loader {
+      display: none;
+      border: 8px solid #f3f3f3;
+      border-top: 8px solid #ff6b35;
+      border-radius: 50%;
+      width: 60px;
+      height: 60px;
+      animation: spin 1s linear infinite;
+      margin: 2rem auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    #poseOptions {
+      margin-bottom: 1rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <!-- Floating background -->
+  <div class="basketball-bg" style="top: 10%; left: 5%">🏀</div>
+  <div class="basketball-bg" style="top: 30%; right: 15%">🏀</div>
+  <div class="basketball-bg" style="bottom: 20%; left: 20%">🏀</div>
+
+  <!-- Header -->
+  <div class="header-bar">
+    <div class="header-left">
+      <img src="images/cpBall_logo.jpg" alt="CP Ball Logo" class="logo" />
+    </div>
+    <div class="header-center">
+      <h2>Jumpshot Analysis 🏀</h2>
+    </div>
+    <div class="header-right">
+      <button class="back-button" onclick="window.location.href='index.html'">← Dashboard</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="content-wrapper shared-content">
+    <!-- Analysis Type Buttons -->
+    <div class="analysis-type-buttons" style="margin-bottom: 1rem;">
+        <button onclick="startAnalysis('jumpshot')">Start Analysis</button>
+      <button onclick="stopAnalysis()" style="background-color: #dc3545; color: white;">Stop Analysis</button>
+    </div>
+
+  <!-- Arm and Save Frame Options for Pose -->
+  <div id="poseOptions" class="pose-options">
+    <div class="option-group">
+      <label class="option-label">Arm to Scan:</label>
+      <label class="radio-label"><input type="radio" name="arm" value="right" checked> Right</label>
+      <label class="radio-label"><input type="radio" name="arm" value="left"> Left</label>
+    </div>
+    <div class="option-group">
+      <label class="option-label">
+        <input type="checkbox" id="saveFramesCheckbox" class="checkbox-style"> Save Frames
+      </label>
+    </div>
+  </div>
+
+    <div class="option-group">
+        <label class="option-label">Select Video:</label>
+        <input type="file" id="videoFileInput" accept="video/*">
+    </div>
+  
+
+    <!-- Loader -->
+    <div id="loader"></div>
+
+    <!-- Live stream image -->
+    <img id="liveStreamImage" style="width: 720px; height: 540px; display: none;" />
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
