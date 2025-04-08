@@ -420,7 +420,7 @@ def detect_and_track_basketball_and_players(image, force_redetect=False):
             if player_lost_frames >= player_lost_threshold:
                 tracking_player = False
                 player_tracker = None
-                print("🛑 Lost tracking player.")
+                print("Lost tracking player.")
 
     if not tracking_player:
         try:
@@ -542,25 +542,25 @@ def process_video():
 
                     # Display info
                     cv2.putText(frame, f"{arm_choice.title()} Elbow Angle: {int(elbow_angle)}°", (50, 50),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 255, 0), 2)
                     cv2.putText(frame, f"Smoothed Shoulder-Elbow Angle: {int(smoothed_angle)}°", (50, 100),
-                                cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 0), 2)
                     if stored_release_angle is not None:
                         cv2.putText(frame, f"Stored Release Angle: {int(stored_release_angle)}°", (50, 150),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             else:
                 cv2.putText(frame, "🕵️ Waiting for player detection...", (50, 50),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 2)
 
             if not tracking_ball:
                 cv2.putText(frame, "👋 Press 'R' to detect basketball", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 0, 255), 2)
             elif ball_detected:
                 cv2.putText(frame, "🎯 Basketball Detected!", (50, 200),
-                            cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 165, 255), 2)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.3, (0, 165, 255), 2)
 
             cv2.putText(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.3, (255, 255, 255), 1)
 
             #cv2.imshow('Release Angle Detection', frame)
             ret, buffer = cv2.imencode('.jpg', frame)

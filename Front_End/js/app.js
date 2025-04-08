@@ -208,27 +208,72 @@ function startAnalysis(type) {
   const videoImage = document.getElementById("liveStreamImage");
   const poseOptions = document.getElementById("poseOptions");
   const saveFramesCheckbox = document.getElementById("saveFramesCheckbox");
-  
+
   if (type === "pose" || type === "shot-release") {
     if (poseOptions) poseOptions.style.display = "block";
     if (saveFramesCheckbox) saveFramesCheckbox.parentElement.style.display = type === "pose" ? "block" : "none";
   } else {
     if (poseOptions) poseOptions.style.display = "none";
   }
-  
+
   loader.style.display = "block";
   videoImage.style.display = "none";
 
-  // Build request body
+  // Special case: Jumpshot analysis with video upload
+  if (type === "jumpshot") {
+    const fileInput = document.getElementById("videoFileInput");
+    const file = fileInput.files[0];
+    if (!file) {
+      alert("Please select a video file first.");
+      loader.style.display = "none";
+      return;
+    }
+  
+    const arm = document.querySelector('input[name="arm"]:checked')?.value || "right";
+  
+    const formData = new FormData();
+    formData.append("video", file);
+    formData.append("arm", arm);
+  
+    const videoImage = document.getElementById("liveStreamImage");
+    videoImage.style.display = "none"; // just in case
+  
+    fetch("http://localhost:8001/upload-jumpshot", {
+      method: "POST",
+      body: formData,
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.status === "ok") {
+        setTimeout(() => {
+          const streamUrl = `http://localhost:8002/video?path=uploads/${file.name}&arm=${arm}`;
+          console.log("✅ Loading stream from:", streamUrl);
+          videoImage.src = streamUrl;
+          videoImage.style.display = "block";
+          loader.style.display = "none";
+        }, 30000);
+      } else {
+        loader.style.display = "none";
+        alert("Server error during video upload.");
+      }
+    })
+    .catch(err => {
+      loader.style.display = "none";
+      alert("Error uploading video or starting analysis.");
+      console.error(err);
+    });
+  
+    return;
+  }
+
+  // Default pose/dribble/shot-release behavior
   let body = { type };
 
-  // Arm selection applies to pose and shot-release
   if (["pose", "shot-release"].includes(type)) {
     const arm = document.querySelector('input[name="arm"]:checked').value;
     body.arm = arm;
   }
 
-  // Save frames only applies to pose
   if (type === "pose") {
     const saveFrames = document.getElementById("saveFramesCheckbox").checked;
     body.save_frames = saveFrames;

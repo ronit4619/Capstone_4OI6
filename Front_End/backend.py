@@ -39,11 +39,42 @@ def start_analysis():
         current_process = subprocess.Popen([
             "python", "analyze_dribble.py"
             ])
-
+    elif analysis_type == "jumpshot-analysis":
+        # Jumpshot is handled separately via /upload-jumpshot
+        print("Jumpshot analysis already started via upload route.")
     else:
         return jsonify({"status": "error", "message": "Invalid type"}), 400
 
     return jsonify({"status": "ok"})
+
+@app.route("/upload-jumpshot", methods=["POST"])
+def upload_jumpshot():
+    global current_process
+
+    if current_process is not None:
+        current_process.terminate()
+        current_process = None
+
+    if 'video' not in request.files:
+        return jsonify({"status": "error", "message": "No video uploaded"}), 400
+
+    file = request.files['video']
+    arm = request.form.get("arm", "right")
+
+    video_path = os.path.join("uploads", file.filename)
+    os.makedirs("uploads", exist_ok=True)
+    file.save(video_path)
+
+    print(f"✅ Uploaded video saved to: {video_path}")
+
+    current_process = subprocess.Popen([
+        "python", "analyze_jumpshot.py",
+        "--video", video_path,
+        "--arm", arm
+    ])
+
+    return jsonify({"status": "ok"})
+
 
 
 @app.route("/stop-analysis", methods=["POST"])

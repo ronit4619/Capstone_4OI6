@@ -818,11 +818,6 @@ def process_video(video_path, arm_choice, consumer_thread):
     cap.release()
     cv2.destroyAllWindows()
 
-
-
-
-
-
 if torch.cuda.is_available():
     print(f"GPU is available: {torch.cuda.get_device_name(0)}")
 else:
@@ -837,3 +832,7 @@ def stream_video():
     consumer_thread = threading.Thread(target=velocity_consumer)
     consumer_thread.start()
     return Response(process_video(video_path, arm, consumer_thread), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    print("Starting pose detection stream on http://localhost:8002/video")
+    app.run(host='0.0.0.0', port=8002)
