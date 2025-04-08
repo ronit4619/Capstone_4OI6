@@ -176,7 +176,7 @@ class shotCounter:
     def __init__(self):
         #Load YOLO model
         self.overlay_text = "Waiting..."
-        self.model = YOLO("shot_counter.pt")
+        self.model = YOLO("shot_counter_vid.pt")
         
         #Uncomment to accelerate inference
         #self.model.half()
@@ -184,7 +184,7 @@ class shotCounter:
         self.class_names = ['Basketball', 'Basketball Hoop']
         self.device = get_device()
         #Uncomment to use webcam
-        self.cap = cv2.VideoCapture(0)
+        self.cap = cv2.VideoCapture("anthony_long.mp4")
 
         #Use video
         #self.cap = cv2.VideoCapture("video_test_5.mp4")

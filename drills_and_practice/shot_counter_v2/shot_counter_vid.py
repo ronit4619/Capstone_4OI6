@@ -81,7 +81,7 @@ def get_available_filename(output_dir, base_name, extension):
     return output_path
 
 # Load Video
-video_path = 'input_vids/vid29.mp4'
+video_path = 'input_vids/steph.mp4'
 cap = cv2.VideoCapture(video_path)
 #cap = cv2.VideoCapture(0)
 
@@ -156,7 +156,7 @@ while True:
             
             # Draw bounding boxes and classnames
             cv2.rectangle(img, (x1, y1), (x2, y2), (255, 255, 255), 4)  # Changed color to white and thickness to 4
-            write_text_with_background(img, f'{current_class.upper()} {conf}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
+            write_text_with_background(img, f'{current_class.upper()} {conf}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
 
 
     # Checks if distance from shoot position and ball keeps increasing after shot attempt
@@ -165,22 +165,26 @@ while True:
         last_ball_pos = [(cx, cy) for cx, cy, frame in list(ball_position)[-5:]]
         if is_increasing_distances((shoot_position[-1][0], shoot_position[-1][1]), last_ball_pos):
             total_attempts += 1
+            print(f"Shot attempt detected. Total attempts: {total_attempts}")
 
     # This means that ball was above rim (or between lower and higher rim bound) in last frame and is now below rim
-    if ball_above_rim and is_ball_below_rim(ball_position[-1], rim_position[-1]):
+    if ball_above_rim and ball_position and rim_position and is_ball_below_rim(ball_position[-1], rim_position[-1]):
         if is_made_shot(ball_above_rim, ball_position[-1], rim_position[-1]):
             total_made += 1
+            print(f"Shot made! Total made: {total_made}")
         ball_above_rim = None
 
     # By doing it through an if statement instead of just assignment, the variable ball_above_rim remains true when
     # lower_rim_bound < ball < higher_rim_bound
-    if is_ball_above_rim(ball_position[-1], rim_position[-1]):
+    # Check if ball_position and rim_position are not empty before accessing
+    if ball_position and rim_position and is_ball_above_rim(ball_position[-1], rim_position[-1]):
         ball_above_rim = ball_position[-1]
     
     # Update the position, font size, and background for the text
-    write_text_with_background(img, f'Shots Attempted: {str(total_attempts)}', (frame_width - 250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
-    write_text_with_background(img, f'Shots Made: {total_made}', (frame_width - 250, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
-    write_text_with_background(img, f'Shots Missed: {total_attempts - total_made}', (frame_width - 250, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
+    write_text_with_background(img, f'Shots Attempted: {str(total_made)}', (frame_width - 250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
+    write_text_with_background(img, f'Shots Made: {total_made}', (frame_width - 250, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
+    shots_missed = max(0, total_attempts - total_made)  # Ensure shots missed is not negative
+    #write_text_with_background(img, f'Shots Missed: {shots_missed}', (frame_width - 250, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
 
     # Adds circles on ball position every 5 frames
     if overlay is None:

@@ -9,7 +9,7 @@ class DribbleCounter:
         self.model = YOLO("dribble_counting.pt")
         
         # Open the video file for processing
-        self.cap = cv2.VideoCapture("drib.mp4")
+        self.cap = cv2.VideoCapture("ron2.mp4")
         #self.cap = cv2.VideoCapture(0)
 
         
@@ -20,7 +20,7 @@ class DribbleCounter:
         self.prev_x_center = None  # Previous x-coordinate of the ball's center
         self.prev_y_center = None  # Previous y-coordinate of the ball's center
         self.prev_delta_y = None  # Previous change in y-coordinate
-        self.dribble_count = 0  # Counter for the number of dribbles
+        self.dribble_count = -1  # Start the dribble counter at -1
         self.dribble_threshold = 0.1  # Threshold for detecting a dribble based on y-coordinate changes
         self.dribble_counted = False  # Flag to ensure a dribble is counted only once per motion cycle
 
@@ -37,7 +37,7 @@ class DribbleCounter:
         # Initialize the video writer only if saving is enabled
         if self.save_video:
             self.output_writer = cv2.VideoWriter(
-                "dribble_count_output.avi",  # Output file name
+                "ron_out2_2.avi",  # Output file name
                 cv2.VideoWriter_fourcc(*"XVID"),  # Codec for the video format
                 self.output_fps,  # Fixed FPS for the output video
                 (self.frame_width, self.frame_height)  # Frame size
@@ -48,6 +48,10 @@ class DribbleCounter:
         self.kalman.measurementMatrix = np.array([[1, 0, 0, 0], [0, 1, 0, 0]], np.float32)  # Measurement matrix
         self.kalman.transitionMatrix = np.array([[1, 0, 1, 0], [0, 1, 0, 1], [0, 0, 1, 0], [0, 0, 0, 1]], np.float32)  # Transition matrix
         self.kalman.processNoiseCov = np.eye(4, dtype=np.float32) * 0.03  # Process noise covariance matrix
+
+        # Add a counter to track consecutive frames without detection
+        self.no_detection_frames = 0
+        self.no_detection_threshold = 10  # Number of frames before interpolation kicks in
 
     def run(self):
         # Start time for calculating FPS
@@ -79,6 +83,7 @@ class DribbleCounter:
                             measurement = np.array([[np.float32(x_center)], [np.float32(y_center)]])
                             self.kalman.correct(measurement)
                             ball_detected = True  # Ball detected in this frame
+                            self.no_detection_frames = 0  # Reset the no-detection counter
 
                             # Predict the next position using the Kalman filter
                             prediction = self.kalman.predict()
@@ -96,29 +101,43 @@ class DribbleCounter:
                             cv2.circle(frame, (int(predicted_x), int(predicted_y)), 5, (0, 255, 0), -1)  # Green circle
 
                 if not ball_detected:
-                    # If no ball is detected, rely on the Kalman filter prediction
-                    prediction = self.kalman.predict()
-                    predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
-                    print(f"Ball prediction (no detection): (x={predicted_x:.2f}, y={predicted_y:.2f})")
-                    
-                    # Update the dribble count based on the predicted position
-                    self.update_dribble_count(predicted_x, predicted_y)
-                    self.prev_x_center = predicted_x
-                    self.prev_y_center = predicted_y
+                    self.no_detection_frames += 1  # Increment no-detection counter
 
-                    # Draw the predicted position on the frame
-                    cv2.circle(frame, (int(predicted_x), int(predicted_y)), 5, (0, 0, 255), -1)  # Red circle for prediction
+                    # Only use interpolation if the ball is not detected for a prolonged period
+                    if self.no_detection_frames >= self.no_detection_threshold:
+                        prediction = self.kalman.predict()
+                        predicted_x, predicted_y = prediction[0, 0], prediction[1, 0]
+                        print(f"Ball prediction (no detection): (x={predicted_x:.2f}, y={predicted_y:.2f})")
+                        
+                        # Update the dribble count based on the predicted position
+                        self.update_dribble_count(predicted_x, predicted_y)
+                        self.prev_x_center = predicted_x
+                        self.prev_y_center = predicted_y
+
+                        # Draw the predicted position on the frame
+                        cv2.circle(frame, (int(predicted_x), int(predicted_y)), 5, (0, 0, 255), -1)  # Red circle for prediction
 
                 # Display the dribble count on the frame
+                # Add a white background rectangle for better text readability
+                text = f"Dribble Count: {self.dribble_count}"
+                font = cv2.FONT_HERSHEY_DUPLEX
+                font_scale = 2
+                thickness = 4
+                text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+                text_x, text_y = 10, self.frame_height - 30  # Position of the text moved down
+                box_coords = ((text_x - 10, text_y - text_size[1] - 10), (text_x + text_size[0] + 10, text_y + 10))
+                cv2.rectangle(frame, box_coords[0], box_coords[1], (255, 255, 255), cv2.FILLED)  # White rectangle
+
+                # Add the black text on top of the white background
                 cv2.putText(
                     frame,
-                    f"Dribble Count: {self.dribble_count}",
-                    (10, 30),  # Position of the text
-                    cv2.FONT_HERSHEY_SIMPLEX,  # Font type
-                    1,  # Font scale
+                    text,
+                    (text_x, text_y),
+                    font,
+                    font_scale,
                     (0, 0, 0),  # Text color (black)
-                    4,  # Thickness of the text
-                    cv2.LINE_AA,  # Anti-aliased text
+                    thickness,
+                    cv2.LINE_AA,
                 )
 
                 # Write the annotated frame to the output video if saving is enabled

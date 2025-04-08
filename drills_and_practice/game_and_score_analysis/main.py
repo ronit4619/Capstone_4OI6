@@ -829,24 +829,28 @@ class BasketballTracker:
         return frame
 
     def draw_stats(self, frame):
-        """Draw stats in the corner of the frame."""
-        # Draw background rectangle for better visibility
-        cv2.rectangle(frame, (10, 10), (200, 90), (0, 0, 0), -1)
-        
-        # Draw stats
-        cv2.putText(frame, f"Total Shots: {self.total_shots}", (20, 30),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        cv2.putText(frame, f"Made: {self.made_shots}", (20, 50),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-        cv2.putText(frame, f"Missed: {self.missed_shots}", (20, 70),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 255), 2)
-        
+        """Draw stats in the bottom-left corner of the frame."""
+        # Define the position and size of the stats box
+        box_x, box_y = 10, self.height - 90  # Bottom-left corner
+        box_width, box_height = 200, 80
+
+        # Draw white background rectangle
+        cv2.rectangle(frame, (box_x, box_y), (box_x + box_width, box_y + box_height), (255, 255, 255), -1)
+
+        # Draw stats text in black
+        cv2.putText(frame, f"Total Shots: {self.total_shots}", (box_x + 10, box_y + 25),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 2)
+        cv2.putText(frame, f"Made: {self.made_shots}", (box_x + 10, box_y + 45),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 2)
+        cv2.putText(frame, f"Missed: {self.missed_shots}", (box_x + 10, box_y + 65),
+                    cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 2)
+
         # Draw percentage if we have shots
         if self.total_shots > 0:
             percentage = (self.made_shots / self.total_shots) * 100
-            cv2.putText(frame, f"{percentage:.1f}%", (120, 50),
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-        
+            cv2.putText(frame, f"{percentage:.1f}%", (box_x + 120, box_y + 45),
+                        cv2.FONT_HERSHEY_DUPLEX, 0.6, (0, 0, 0), 2)
+
         return frame
 
     def process_video_file(self):

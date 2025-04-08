@@ -21,7 +21,7 @@ frame_width = int(cap.get(3))
 frame_height = int(cap.get(4))
 
 # Define the codec and create VideoWriter object
-out = cv2.VideoWriter('output.mp4', cv2.VideoWriter_fourcc(*'mp4v'), 10, (frame_width, frame_height))
+out = cv2.VideoWriter('output.avi', cv2.VideoWriter_fourcc(*'XVID'), 10, (frame_width, frame_height))
 
 while True:
     # Grab the image
@@ -45,47 +45,50 @@ while True:
         # Polynomial Regression
         A, B, C = np.polyfit(posListX, posListY, 2)
 
-        for x, (posX, posY) in enumerate(zip(posListX, posListY)):
-            pos = (posX, posY)
-            cv2.circle(img, tuple(pos), 10, (0, 255, 0), cv2.FILLED)
-            if x == 0:
-                cv2.line(img, tuple(pos), tuple(pos), (255, 0, 0), 5)
-            else:
-                cv2.line(img, tuple(pos), (posListX[x - 1], posListY[x - 1]), (255, 0, 0), 2)
+        # Draw trajectory as small neon orange dots
+        for x, y in zip(posListX, posListY):
+            cv2.circle(img, (x, y), 3, (0, 165, 255), cv2.FILLED)  # Neon orange (BGR: 0, 165, 255)
 
-        for x in xList:
-            y = int(A * x ** 2 + B * x + C)
-            cv2.circle(img, (x, y), 2, (0, 0, 255), cv2.FILLED)
+        # Draw predicted trajectory as neon blue dashes
+        for i, x in enumerate(xList):
+            if i % 5 == 0:  # Skip some points to create a dashed effect
+                y = int(A * x ** 2 + B * x + C)
+                cv2.circle(img, (x, y), 2, (255, 0, 0), cv2.FILLED)  # Neon blue (BGR: 255, 0, 0)
 
         if len(posListX) > 1:
             # Check for upward motion indicating a shot
-            if posListY[-1] < posListY[-2] - 10:  # Threshold to detect significant upward motion
+            if posListY[-1] < posListY[-2] - 5:  # Reduced threshold for better sensitivity
                 shot_detected = True
             else:
                 shot_detected = False
 
-        if shot_detected and len(posListX) < 10:
+        if shot_detected and len(posListX) < 15:  # Increased point limit for better prediction
             # Predictions
             a = A
             b = B
             c = C - 590
 
             discriminant = b ** 2 - (4 * a * c)
+            #cv2.putText(img, f"Discriminant: {discriminant:.2f}", (50, 300), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
             if discriminant >= 0:  # Check if the discriminant is non-negative
-                x = int((-b - math.sqrt(discriminant)) / (2 * a))
-                prediction = 300 < x < 400
-            elif discriminant <= 0:  # Check if the discriminant is non-negative
-                x = int(((-b - math.sqrt(0-discriminant)) / (2 * a)))
-                prediction = 300 < x < 400
+                x = int((-b + math.sqrt(discriminant)) / (2 * a))
+                #cv2.putText(img, f"x: {x:.2f}", (50, 500), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+
+                # Expanded range for leniency near the rim
+                prediction = 850 < x# Adjusted range for more leniency
             else:
                 prediction = False  # If discriminant is negative, no valid prediction
 
         if prediction:
-            cvzone.putTextRect(img, "Basket", (50, 150), scale=5, thickness=5, colorR=(0, 200, 0), offset=20)
+            cvzone.putTextRect(img, "Basket", (20, 100), scale=3, thickness=3, colorR=(255, 255, 255), colorT=(0, 0, 0), offset=10)
         else:
-            cvzone.putTextRect(img, "No Basket", (50, 150), scale=5, thickness=5, colorR=(0, 0, 200), offset=20)
+            cvzone.putTextRect(img, "No Basket", (20, 100), scale=3, thickness=3, colorR=(255, 255, 255), colorT=(0, 0, 0), offset=10)
 
     # Display
+    # Draw lines for prediction range
+    #cv2.line(img, (950, 0), (950, img.shape[0]), (255, 255, 0), 2)  # Left boundary
+    #cv2.line(img, (1095, 0), (1095, img.shape[0]), (255, 255, 0), 2)  # Right boundary
+
     img = cv2.resize(img, (0, 0), None, 0.7, 0.7)
     cv2.imshow("Image", img)
 
