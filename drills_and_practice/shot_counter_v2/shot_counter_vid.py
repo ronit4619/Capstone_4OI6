@@ -80,143 +80,142 @@ def get_available_filename(output_dir, base_name, extension):
         counter += 1
     return output_path
 
-# Load Video
-video_path = 'input_vids/steph.mp4'
-cap = cv2.VideoCapture(video_path)
-#cap = cv2.VideoCapture(0)
+def main():
+    # Load Video
+    video_path = 'input_vids/steph.mp4'
+    cap = cv2.VideoCapture(video_path)
+    # cap = cv2.VideoCapture(0)
+
+    # Stuff for output video
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+    output_path = get_available_filename('output_vids', 'output', 'avi')
+    fourcc = cv2.VideoWriter_fourcc(*'XVID')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+    model = YOLO("shot_counter_vid.pt")
+
+    # "made" class doesn't work very well
+    classnames = ["ball", "made", "person", "rim", "shoot"]
+
+    total_attempts = 0
+    total_made = 0
+
+    frame = 0
+
+    # In the format [x_center, y_center, frame]
+    ball_position = deque(maxlen=30)
+    shoot_position = deque(maxlen=30)
+    # In the format [x1, y1, x2, y2, frame]
+    rim_position = deque(maxlen=30)
+
+    ball_above_rim = None
+
+    overlay = None
+
+    while True:
+        success, img = cap.read()
+        if not success:
+            break
+
+        results = model(img, stream=True)
+        detections = np.empty((0, 5))
+
+        for r in results:
+            boxes = r.boxes
+            for box in boxes:
+                # Bounding Box and confidence
+                x1, y1, x2, y2 = box.xyxy[0]
+                x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
+                w, h = x2 - x1, y2 - y1
+                conf = math.ceil(box.conf[0] * 100) / 100
+
+                # Class name
+                cls = int(box.cls[0])
+                current_class = classnames[cls]
+
+                cx, cy = x1 + w // 2, y1 + h // 2
+
+                # Detecting the "shoot" action
+                if current_class == "shoot" and conf > 0.4:
+                    shoot_position.append([cx, cy, frame])
+
+                # Check if ball is detected
+                if current_class == "ball" and conf > 0.4:
+                    ball_position.append([cx, cy, frame])
+
+                    # Draw the center point
+                    cv2.circle(img, (cx, cy), 5, (0, 0, 200), cv2.FILLED)
+
+                # Check if rim is detected
+                if current_class == "rim" and conf > 0.4:
+                    rim_position.append([x1, y1, x2, y2, frame])
+
+                # Draw bounding boxes and classnames
+                cv2.rectangle(img, (x1, y1), (x2, y2), (255, 255, 255), 4)  # Changed color to white and thickness to 4
+                write_text_with_background(img, f'{current_class.upper()} {conf}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
+
+        # Checks if distance from shoot position and ball keeps increasing after shot attempt
+        # Checks if last time "shoot" was detected was five frames ago
+        if shoot_position and shoot_position[-1][2] == frame - 5:
+            last_ball_pos = [(cx, cy) for cx, cy, frame in list(ball_position)[-5:]]
+            if is_increasing_distances((shoot_position[-1][0], shoot_position[-1][1]), last_ball_pos):
+                total_attempts += 1
+                print(f"Shot attempt detected. Total attempts: {total_attempts}")
+
+        # This means that ball was above rim (or between lower and higher rim bound) in last frame and is now below rim
+        if ball_above_rim and ball_position and rim_position and is_ball_below_rim(ball_position[-1], rim_position[-1]):
+            if is_made_shot(ball_above_rim, ball_position[-1], rim_position[-1]):
+                total_made += 1
+                print(f"Shot made! Total made: {total_made}")
+            ball_above_rim = None
+
+        # Check if ball_position and rim_position are not empty before accessing
+        if ball_position and rim_position and is_ball_above_rim(ball_position[-1], rim_position[-1]):
+            ball_above_rim = ball_position[-1]
+
+        # Update the position, font size, and background for the text
+        #write_text_with_background(img, f'Shots Attempted: {str(total_made)}', (frame_width - 250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
+        write_text_with_background(img, f'Shots Made: {total_made}', (frame_width - 250, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
+        #shots_missed = max(0, total_attempts - total_made)  # Ensure shots missed is not negative
+
+        # Adds circles on ball position every 5 frames
+        if overlay is None:
+            overlay = np.zeros_like(img, dtype=np.uint8)
+
+        # Draws a path for the balls
+        if frame % 5 == 0:
+            # Clear the overlay (reset to transparent)
+            overlay = np.zeros_like(img, dtype=np.uint8)
+
+            for pos in ball_position:
+                cx, cy, pos_frame = pos
+                if pos_frame % 5 == 0:
+                    cv2.circle(overlay, (cx, cy), 5, (0, 0, 255), cv2.FILLED)
+
+        frame += 1
+
+        # Blend the overlay onto the main frame
+        blended_img = cv2.addWeighted(img, 1.0, overlay, 1, 0)
+
+        cv2.imshow("Image", blended_img)
+
+        # Write the frame to the video file
+        out.write(blended_img)
+
+        # To watch video frame by frame
+        # cv2.waitKey(0)
+
+        # To watch video continuously
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+
+    cap.release()
+    out.release()
+    cv2.destroyAllWindows()
 
 
-# Stuff for output video
-frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-fps = int(cap.get(cv2.CAP_PROP_FPS))
-
-output_path = get_available_filename('output_vids', 'output', 'avi')
-fourcc = cv2.VideoWriter_fourcc(*'XVID')
-out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
-
-model = YOLO("shot_counter_vid.pt")
-
-# "made" class doesn't work very well
-classnames = ["ball", "made", "person", "rim", "shoot"]
-
-total_attempts = 0
-total_made = 0
-
-frame = 0
-
-# In the format [x_center, y_center, frame]
-ball_position = deque(maxlen=30)
-shoot_position = deque(maxlen=30)
-# In the format [x1, y1, x2, y2, frame]
-rim_position = deque(maxlen=30)
-
-ball_above_rim = None
-
-overlay = None
-
-while True:
-    success, img = cap.read()
-    if not success:
-        break
-
-    results = model(img, stream=True)
-    detections = np.empty((0,5))
-
-    for r in results:
-        boxes = r.boxes
-        for box in boxes:
-            
-            # Bounding Box and confidence
-            x1, y1, x2, y2 = box.xyxy[0]
-            x1, y1, x2, y2 = int(x1), int(y1), int(x2), int(y2)
-            w, h = x2-x1, y2-y1
-            conf = math.ceil(box.conf[0] * 100) / 100
-
-            # Class name
-            cls = int(box.cls[0])
-            current_class = classnames[cls]
-
-            cx, cy = x1+w // 2, y1+h // 2
-
-            # Detecting the "shoot" action
-            if current_class == "shoot" and conf>0.4:
-                shoot_position.append([cx, cy, frame])
-            
-            # Check if ball is detected
-            if current_class == "ball" and conf>0.4:
-                ball_position.append([cx, cy, frame])
-
-                # Draw the center point
-                cv2.circle(img, (cx, cy), 5, (0, 0, 200), cv2.FILLED)
-
-            # Check if rim is detected
-            if current_class == "rim" and conf>0.4:
-                rim_position.append([x1, y1, x2, y2, frame])
-            
-            # Draw bounding boxes and classnames
-            cv2.rectangle(img, (x1, y1), (x2, y2), (255, 255, 255), 4)  # Changed color to white and thickness to 4
-            write_text_with_background(img, f'{current_class.upper()} {conf}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
-
-
-    # Checks if distance from shoot position and ball keeps increasing after shot attempt
-    # Checks if last time "shoot" was detected was five frames ago
-    if shoot_position and shoot_position[-1][2] == frame - 5:
-        last_ball_pos = [(cx, cy) for cx, cy, frame in list(ball_position)[-5:]]
-        if is_increasing_distances((shoot_position[-1][0], shoot_position[-1][1]), last_ball_pos):
-            total_attempts += 1
-            print(f"Shot attempt detected. Total attempts: {total_attempts}")
-
-    # This means that ball was above rim (or between lower and higher rim bound) in last frame and is now below rim
-    if ball_above_rim and ball_position and rim_position and is_ball_below_rim(ball_position[-1], rim_position[-1]):
-        if is_made_shot(ball_above_rim, ball_position[-1], rim_position[-1]):
-            total_made += 1
-            print(f"Shot made! Total made: {total_made}")
-        ball_above_rim = None
-
-    # By doing it through an if statement instead of just assignment, the variable ball_above_rim remains true when
-    # lower_rim_bound < ball < higher_rim_bound
-    # Check if ball_position and rim_position are not empty before accessing
-    if ball_position and rim_position and is_ball_above_rim(ball_position[-1], rim_position[-1]):
-        ball_above_rim = ball_position[-1]
-    
-    # Update the position, font size, and background for the text
-    write_text_with_background(img, f'Shots Attempted: {str(total_made)}', (frame_width - 250, 50), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
-    write_text_with_background(img, f'Shots Made: {total_made}', (frame_width - 250, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 0), (255, 255, 255), 1)
-    shots_missed = max(0, total_attempts - total_made)  # Ensure shots missed is not negative
-    #write_text_with_background(img, f'Shots Missed: {shots_missed}', (frame_width - 250, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), (255, 255, 255), 2)
-
-    # Adds circles on ball position every 5 frames
-    if overlay is None:
-        overlay = np.zeros_like(img, dtype=np.uint8)
-
-    # Draws a path for the balls
-    if frame % 5 == 0:
-        # Clear the overlay (reset to transparent)
-        overlay = np.zeros_like(img, dtype=np.uint8)
-        
-        for pos in ball_position:
-            cx, cy, pos_frame = pos
-            if pos_frame % 5 == 0:
-                cv2.circle(overlay, (cx, cy), 5, (0, 0, 255), cv2.FILLED)
-    
-    frame += 1
-
-    # Blend the overlay onto the main frame
-    blended_img = cv2.addWeighted(img, 1.0, overlay, 1, 0)
-
-    cv2.imshow("Image", blended_img)
-
-    # Write the frame to the video file
-    out.write(blended_img)
-
-    # To watch video frame by frame
-    # cv2.waitKey(0)
-
-    # To watch video continuosly
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-cap.release()
-out.release()
-cv2.destroyAllWindows()
+if __name__ == "__main__":
+    main()
