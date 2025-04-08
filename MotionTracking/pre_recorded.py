@@ -280,7 +280,7 @@ def detect_and_track_basketball(image, force_redetect=False):
 
 
 
-def determine_dynamic_scale(x1, x2,real_diameter_m=0.25):
+def determine_dynamic_scale(x1, x2,real_diameter_m=0.22):
     """
     Calculates pixels-per-meter scale using basketball diameter.
 
@@ -364,6 +364,8 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
     t_vals = np.linspace(0, 2 * v * np.sin(angle_rad) / g, num=100)
     points = []
     ball_made = False
+    hit_above = False
+    hit_inside = False
 
     # Parse rim if provided
     if rim:
@@ -378,20 +380,29 @@ def generate_projectile_points(release_angle_deg, v=7.9, g=9.81, scale=135, star
 
         # Check if this point "goes in" the hoop
         if rim:
+            # 1️⃣ Point passed above rim (entry path)
             if rim_left <= x_px <= rim_right and y_px <= rim_top:
-                ball_made = True
+                hit_above = True
+
+            # 2️⃣ Point inside rim box
+            if rim_left <= x_px <= rim_right and rim_top <= y_px <= rim_bottom:
+                hit_inside = True
+
+        if rim and hit_above and hit_inside:
+            ball_made = True
+            
 
     # Logging
-    log_data = {
-        "launch_angle_deg": round(release_angle_deg, 2),
-        "velocity_mps": round(v, 2),
-        "scale_px_per_m": round(scale, 2),
-        "ball_made": ball_made
-    }
+    # log_data = {
+    #     "launch_angle_deg": round(release_angle_deg, 2),
+    #     "velocity_mps": round(v, 2),
+    #     "scale_px_per_m": round(scale, 2),
+    #     "ball_made": ball_made
+    # }
 
-    filename = "generate_projectile_points_log.json"
-    with open(filename, "w") as f:
-        json.dump(log_data, f, indent=2)
+    # filename = "generate_projectile_points_log.json"
+    # with open(filename, "w") as f:
+    #     json.dump(log_data, f, indent=2)
 
     return points, ball_made
 
@@ -444,7 +455,7 @@ def average_initial_velocity(ball_positions):
 def velocity_consumer():
     global latest_speed
     global latest_release_ball_angle
-    ball_position_buffer = []
+    ball_position_buffer = deque(maxlen=60) # lets cap for memory effeciency
 
     while True:
         try:
@@ -551,9 +562,9 @@ def log_release_speed_to_json(speed, filename="release_speeds.json"):
 def process_video():
     max_velocity = -1 #### have to reset somwhere
     projectile_points = []
-    arm_choice = input("👉 Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
+    arm_choice = input("Which arm would you like to track? Type 'left' or 'right': ").strip().lower()
     if arm_choice not in ['left', 'right']:
-        print("❌ Invalid choice. Please enter 'left' or 'right'.")
+        print("Invalid choice. Please enter 'left' or 'right'.")
         return
 
     SHOULDER = getattr(mp_pose.PoseLandmark, f"{arm_choice.upper()}_SHOULDER").value
@@ -567,14 +578,16 @@ def process_video():
     #"C:/Users/antho/Downloads/20250325_102838.mp4"
     #"C:/Users/antho/Downloads/IMG_0519.MOV"
 
-    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0523.MOV")
+    #cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0540.MOV")
+    #cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0524.MOV")
+    cap = cv2.VideoCapture("C:/Users/antho/Downloads/IMG_0540.MOV")
     fps = cap.get(cv2.CAP_PROP_FPS)
     if not cap.isOpened():
-        print("❌ Error: Could not access webcam.")
+        print("Error: Could not access webcam.")
         return
 
-    print("✅ Webcam opened successfully!")
-    print("🎮 Press 'R' to re-detect basketball | 'Q' to quit")
+    print("Webcam opened successfully!")
+    print("Press 'R' to re-detect basketball | 'Q' to quit")
     print(fps)
     stored_release_angle = None
 
@@ -721,8 +734,11 @@ def process_video():
                             current_angle = latest_release_ball_angle
 
                         if current_speed is not None:
-                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and  ball_center[1] > shoulder[1]:
+                            if (calculate_distance(wrist,ball_center) / dynamic_scale )< 0.1 and ball_center[1] > shoulder[1]:
                                 max_velocity = -1 # reset
+                                max_angle = current_angle
+                                if max_angle <0:
+                                    max_angle = 180 + max_angle
                                 
                             if max_velocity <= current_speed:
                                 max_velocity = current_speed                        
@@ -741,21 +757,30 @@ def process_video():
                                     (0, 255, 255),  # yellow color
                                     2
                                 )
+                            cv2.putText(
+                                    frame,
+                                    f"Actual Ball Release angle: {max_angle:.2f} deg",
+                                    (50, 450),  # 35px lower than the "valid pose" label
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    0.6,
+                                    (0, 255, 255),  # yellow color
+                                    2
+                                )
                             if make == True:
                                 overlay = frame.copy()
                                 flash_color = (0, 255, 0)  # Bright green
                                 alpha = 0.4  # Transparency level
 
                                 # Draw a green transparent overlay
-                                cv2.rectangle(overlay, (0, 0), (frame.shape[1], frame.shape[0]), flash_color, -1)
-                                cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
-                                cv2.putText(frame, "✅ Shot Made!", (50, 50),
+                                # cv2.rectangle(overlay, (0, 0), (frame.shape[1], frame.shape[0]), flash_color, -1)
+                                # cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+                                cv2.putText(frame, "Shot Made!", (50, 50),
                                 cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 3)
 
 
                        
                     for (x, y) in projectile_points:
-                        if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 2, (0, 0, 255), -1)
+                        if 0 <= x < frame.shape[1] and 0 <= y < frame.shape[0]:cv2.circle(frame, (x, y), 3, (0, 0, 255), -1)
 
                 elif not tracking_ball:
                     cv2.putText(frame, "Press 'R' to detect basketball", (50, 200),
@@ -775,10 +800,11 @@ def process_video():
             cv2.putText(frame, "Press 'R' to re-detect | 'Q' to quit", (50, frame.shape[0] - 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
+            cv2.namedWindow('Release Angle Detection', cv2.WINDOW_NORMAL)
             cv2.imshow('Release Angle Detection', frame)
 
             if key == ord('q'):
-                print("🛑 Exiting...")
+                print(" Exiting...")
                 break
 
     ball_queue.put("STOP")  # Gracefully signal the thread to stop
